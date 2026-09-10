@@ -25,6 +25,8 @@ The portability and reproducibility of a containerized process mean we have an o
   - **Docker**
   - LXC (Linux Containers)
   - rkt (CoreOS Rocket)
+  - podman
+  - etc..
 
 ## Container vs Virtual Machines vs Bare metal
 
@@ -83,14 +85,14 @@ Kubernetes, one specific implementation of cloud-native orchestration, is an ope
 
 ![Kubernetes cluster](assets/kubernetes_cluster.jpg)
 
-## Modern Cloud-native Data Platform Stack
+## Modern Cloud-native Data Platform Stack Examples
 
 - Orchestration Layer: Kubernetes
   - Container runtime and pod scheduling
   - CustomResourceDefinitions (CRDs) for domain-specific operators
   - RBAC, networking policies, secrets management
 
-- Storage Layer: Object Storage (S3-compatible)
+- Storage Layer: Object Storage (S3-compatible) (block or FS are options too)
   - Cloud provider services (Azure Blob, AWS S3, GCP Cloud Storage)
   - On-premises: Ceph with RADOS Gateway (RGW)
   - Immutable, cost-effective, globally accessible

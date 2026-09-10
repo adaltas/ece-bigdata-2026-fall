@@ -46,6 +46,22 @@ What is an Information System (IS)?
 - Store it
 - Distribute it
 
+## Distributed systems
+
+A distributed system is a group of computers that appear as a unique and coherent system to the end user.
+
+- Advantages:
+
+  - Scalability
+  - Availability
+  - Flexibility
+
+- Disadvantages:
+
+  - Harder to architecture
+  - Harder to use
+  - Harder to maintain
+
 ## The CAP Theorem
 
 - **Consistency**: For one given query, all the nodes return the most recent value or an error
@@ -87,22 +103,6 @@ What is an Information System (IS)?
 
 - **Unstructured:** plain text, images, sound
 
-## Distributed systems
-
-A distributed system is a group of computers that appear as a unique and coherent system to the end user.
-
-- Advantages:
-
-  - Scalability
-  - Availability
-  - Flexibility
-
-- Disadvantages:
-
-  - Harder to architecture
-  - Harder to use
-  - Harder to maintain
-
 ## The 3 Vs
 
 - Volume
@@ -110,7 +110,7 @@ A distributed system is a group of computers that appear as a unique and coheren
 - Variety
 - ... and friends
 
-Modern data platforms must handle the classic "3 Vs" challenges, now solved through cloud-native architecture:
+Modern data platforms must handle the classic "3 Vs" challenges, now solved through cloud-native architecture. Modern data platforms recognize additional challenges, sometimes called the 5 Vs, 7 Vs, or more, depending on the context.
 
 ### Volume
 
