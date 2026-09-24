@@ -37,8 +37,7 @@ Pipelines run in two modes:
 - **Batch**: data is processed in bounded chunks, on a schedule (every hour, every night) or when a file arrives. Simple
   to reason about, reprocess and test. Latency ranges from minutes to a day.
 - **Streaming**: data is processed continuously, record by record or in micro-batches, as events happen. Latency ranges
-  from milliseconds to seconds, at the cost of more complex operations (state, ordering, late events). Streaming is
-  covered in the Kafka and Structured Streaming modules.
+  from milliseconds to seconds, at the cost of more complex operations (state, ordering, late events).
 
 This module focuses on batch pipelines, which remain the majority of analytics workloads.
 
@@ -63,7 +62,7 @@ Extraction pulls the data from its source, with as little impact as possible on 
   is missed.
 - **Change Data Capture (CDC)**  
   The changes (inserts, updates, deletes) are read from the transaction log of the database, for example with Debezium.
-  It captures every change with a low impact on the source, and is covered in the Kafka module.
+  It captures every change with a low impact on the source.
 
 Extraction must deal with the constraints of the sources: API rate limits and pagination, credentials rotation, time
 zones, and schema drift, when a source adds, removes or renames a column without notice.
