@@ -48,6 +48,11 @@ Onyxia configures the S3 access of the service in two places:
 - the `default` profile of the AWS configuration files, `~/.aws/credentials` and `~/.aws/config`
 - `AWS_*` environment variables
 
+To configure the AWS configurations and credentials, please copy the script from the S3 Profile Details in Data Storage tab,
+and execute the copied script in the terminal.
+
+![](./assets/onyxia-aws-config.png)
+
 The credentials are temporary. The profile is the reference: the environment variables may be missing or outdated and
 lead to authentication errors. All the commands of this lab explicitly use the profile with `--profile 'default'`.
 

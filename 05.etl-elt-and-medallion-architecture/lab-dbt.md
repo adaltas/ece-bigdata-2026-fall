@@ -20,14 +20,14 @@ resources:
   - title: dbt node selection syntax (official documentation)
     url: https://docs.getdbt.com/reference/node-selection/syntax
 revisions:
-  - date: 2026-09-17
-    comment: Initial page
-    author: pierre@adaltas.com
+  - date: 2026-09-25
+    comment: Update
+    author: mori@adaltas.com
 tags:
   - name: TUTORIAL
 ---
 
-# Lab: Medallion architecture with dbt and DuckDB
+# Lab: Bronze to Silver transformation with dbt and DuckDB
 
 ## Objectives
 
@@ -46,45 +46,75 @@ tags:
 - The [DuckDB lab](../04.sql-analytics/lab-duckdb.md), in particular the S3 configuration with the
   `s3_onyxia_connection` secret
 
+## Architecture
+
+In this lab, the raw datasets already exist in the **bronze** layer:
+
+```text
+S3
+└── bronze/
+    ├── users.csv
+    └── orders.csv
+```
+
+dbt does not ingest or modify these files. It declares them as sources and transforms them into the **silver** layer:
+
+```text
+S3 bronze
+    │
+    ├── users.csv ──→ stg_users
+    │
+    └── orders.csv ─→ stg_orders
+                         │
+                         ▼
+                    Silver layer
+```
+
+The bronze files remain unchanged. The silver models contain typed, cleaned and deduplicated data suitable for downstream analytics.
+
 ## Environment
 
-Move into the project and set the environment variables used in the previous labs.
+Move into the project and define the bucket name:
 
 ```bash
-# Define the name of your repo/directory accordinly
 GIT_REPO_NAME=<git-repo-name>
-# Environment setup
+
 cd /home/onyxia/work/$GIT_REPO_NAME
+
 export LAB_BUCKET_NAME="$KUBERNETES_NAMESPACE"
+
 echo "$LAB_BUCKET_NAME"
 #> user-gollum
 ```
 
-Check that the datasets are present in the bronze layer:
+Check that the bronze datasets are present:
 
 ```bash
-aws s3 --profile 'default' ls "s3://$LAB_BUCKET_NAME/bronze/"
+aws s3 --profile default ls "s3://$LAB_BUCKET_NAME/bronze/"
 #> 2026-09-14 11:02:10     331568 orders.csv
 #> 2026-09-14 11:02:09       7351 users.csv
 ```
 
-If they are missing, generate and upload them again:
+If the files are missing, generate and upload them again:
 
 ```bash
 uv run dataset-users -o csv > users.csv
 uv run dataset-orders -o csv > orders.csv
-aws s3 --profile 'default' cp users.csv "s3://$LAB_BUCKET_NAME/bronze/users.csv"
-aws s3 --profile 'default' cp orders.csv "s3://$LAB_BUCKET_NAME/bronze/orders.csv"
+
+aws s3 --profile default cp users.csv \
+  "s3://$LAB_BUCKET_NAME/bronze/users.csv"
+aws s3 --profile default cp orders.csv \
+  "s3://$LAB_BUCKET_NAME/bronze/orders.csv"
 ```
 
-dbt reads `LAB_BUCKET_NAME` when it compiles the models. The variable must be exported in every new terminal, or
-appended to `~/.bashrc`.
+The bucket name is read from the `LAB_BUCKET_NAME` environment variable by dbt.
 
 ## Installation
 
 dbt Core is a Python package. Each database is supported by an adapter, a separate package which depends on `dbt-core`.
-[dbt-duckdb](https://github.com/duckdb/dbt-duckdb) runs the models inside an embedded DuckDB database. Add it to the uv
-project:
+[dbt-duckdb](https://github.com/duckdb/dbt-duckdb) runs the models inside an embedded DuckDB database.
+
+Add it to the existing uv project:
 
 ```bash
 uv add dbt-duckdb
@@ -97,8 +127,23 @@ uv run dbt --version
 #>   - duckdb: 1.11.0 - Up to date!
 ```
 
-The versions may differ. dbt does not process the data itself: it compiles SQL statements and sends them to DuckDB,
-which reads and writes the files on S3.
+The versions may differ.
+
+dbt does not process the data itself. It compiles SQL and sends the resulting statements to DuckDB.
+
+The architecture is therefore:
+
+```text
+dbt
+ │
+ │ compiles SQL / executes models
+ ▼
+DuckDB
+ │
+ │ reads
+ ▼
+S3 bronze/*.csv
+```
 
 ## dbt project
 
@@ -109,8 +154,11 @@ the connection is configured below.
 
 ```bash
 uv run dbt init lab_medallion --skip-profile-setup
+
 cd lab_medallion
+
 rm -rf models/example
+
 find . -type f | sort
 #> ./analyses/.gitkeep
 #> ./dbt_project.yml
@@ -132,6 +180,25 @@ The remaining commands of the lab are executed from the `lab_medallion` director
 - `macros/`: reusable Jinja functions
 - `snapshots/`, `analyses/`: slowly changing dimensions and ad-hoc queries, not used in this lab
 
+```text
+lab_medallion/
+├── models/
+├── tests/
+├── macros/
+├── seeds/
+├── snapshots/
+├── analyses/
+└── dbt_project.yml
+```
+
+For this lab, we mainly use:
+
+- `models/`: SQL models and their documentation/tests
+- `tests/`: singular SQL tests
+- `dbt_project.yml`: project configuration
+
+We will not use seeds, snapshots or analyses.
+
 ### Connection profile
 
 The connection is defined in a profile. dbt looks for the `profiles.yml` file in the current directory first, then in
@@ -151,15 +218,15 @@ lab_medallion:
 YAML
 ```
 
-- `target`: the default output. A project typically defines several ones, such as `dev` and `prod`, selected with
-  `--target`.
-- `path`: the DuckDB database file storing the tables and views created by dbt. The data of the bronze layer stays on
-  S3.
-- `threads`: the number of models built in parallel.
-- `settings`: DuckDB options applied to each connection.
+The profile defines how dbt connects to DuckDB.
 
-The `s3_onyxia_connection` persistent secret, created by Onyxia, is loaded by the DuckDB library embedded in dbt, like
-the CLI in the previous lab. Outside of Onyxia, secrets are declared in the profile with the `secrets` property.
+- `target`: the default target
+- `path`: the DuckDB database file
+- `threads`: number of models that can run in parallel
+- `settings`: DuckDB configuration
+
+In the Onyxia environment, the S3 credentials are already available to DuckDB through the persistent
+`s3_onyxia_connection` secret created in the previous DuckDB lab.
 
 Validate the configuration and the connection:
 
@@ -184,8 +251,7 @@ uv run dbt debug
 
 ### Project configuration
 
-Replace `dbt_project.yml`. The models are organized in one directory per layer, and each directory is configured with a
-materialization and a schema:
+Replace `dbt_project.yml` with:
 
 ```bash
 cat > dbt_project.yml <<'YAML'
@@ -209,15 +275,13 @@ models:
     silver:
       +materialized: view
       +schema: silver
-    gold:
-      +materialized: table
-      +schema: gold
-
-seeds:
-  lab_medallion:
-    +schema: reference
 YAML
-mkdir -p models/bronze models/silver models/gold
+```
+
+Create the silver directory:
+
+```bash
+mkdir -p models/bronze models/silver
 ```
 
 The `+` prefix marks a configuration inherited by all the resources of the directory, and each model can override it.
@@ -376,7 +440,7 @@ SQL
 The generator does not produce duplicates, but ingestion processes do: retried extractions, overlapping incremental
 loads. The deduplication makes the model robust to a replay of the bronze layer.
 
-### Build
+## Build
 
 `dbt run` builds the models. The `--select` option restricts the execution to the models of the `silver` directory:
 
@@ -446,82 +510,6 @@ Questions:
 
 - The silver models are views. What happens when a view is queried, and when is it preferable to a table?
 - `UUID` values are stored in 16 bytes. How many bytes does the `VARCHAR` representation use?
-
-## Seeds
-
-The gold layer groups the users by region. The mapping between a state code and its region is reference data: it
-rarely changes and does not come from an operational system. dbt loads such small CSV files, versioned with the
-project, as seeds.
-
-```bash
-cat > seeds/states.csv <<'CSV'
-code,name,region
-AL,Alabama,South
-AK,Alaska,West
-AZ,Arizona,West
-AR,Arkansas,South
-CA,California,West
-CO,Colorado,West
-CT,Connecticut,Northeast
-DE,Delaware,South
-DC,District of Columbia,South
-FL,Florida,South
-GA,Georgia,South
-HI,Hawaii,West
-ID,Idaho,West
-IL,Illinois,Midwest
-IN,Indiana,Midwest
-IA,Iowa,Midwest
-KS,Kansas,Midwest
-KY,Kentucky,South
-LA,Louisiana,South
-ME,Maine,Northeast
-MD,Maryland,South
-MA,Massachusetts,Northeast
-MI,Michigan,Midwest
-MN,Minnesota,Midwest
-MS,Mississippi,South
-MO,Missouri,Midwest
-MT,Montana,West
-NE,Nebraska,Midwest
-NV,Nevada,West
-NH,New Hampshire,Northeast
-NJ,New Jersey,Northeast
-NM,New Mexico,West
-NY,New York,Northeast
-NC,North Carolina,South
-ND,North Dakota,Midwest
-OH,Ohio,Midwest
-OK,Oklahoma,South
-OR,Oregon,West
-PA,Pennsylvania,Northeast
-RI,Rhode Island,Northeast
-SC,South Carolina,South
-SD,South Dakota,Midwest
-TN,Tennessee,South
-TX,Texas,South
-UT,Utah,West
-VT,Vermont,Northeast
-VA,Virginia,South
-WA,Washington,West
-WV,West Virginia,South
-WI,Wisconsin,Midwest
-WY,Wyoming,West
-AS,American Samoa,Territories
-GU,Guam,Territories
-MP,Northern Mariana Islands,Territories
-PR,Puerto Rico,Territories
-VI,U.S. Virgin Islands,Territories
-FM,Federated States of Micronesia,Freely associated states
-MH,Marshall Islands,Freely associated states
-PW,Palau,Freely associated states
-CSV
-uv run dbt seed
-#> ...
-#> 1 of 1 OK loaded seed file main_reference.states ............................... [INSERT 59 in 0.04s]
-```
-
-The seed is referenced in the models like any other model, with `{{ ref('states') }}`.
 
 ## Data tests
 
@@ -595,67 +583,71 @@ Run the tests of the silver layer:
 
 ```bash
 uv run dbt test --select silver
-#> ...
-#> 10 of 13 FAIL 6 relationships_stg_users_state__code__ref_states_ ............... [FAIL 6 in 0.05s]
-#> ...
-#> Completed with 1 error, 0 partial successes, and 0 warnings:
-#>
-#> [ERROR]: in test relationships_stg_users_state__code__ref_states_ (models/silver/silver.yml)
-#>   Got 6 results, configured to fail if != 0
-#>
-#>   compiled code at target/compiled/lab_medallion/models/silver/silver.yml/relationships_stg_users_state__code__ref_states_.sql
-#>
-#> Done. PASS=12 WARN=0 ERROR=1 SKIP=0 NO-OP=0 REUSED=0 TOTAL=13
 ```
 
-### Investigate a failure
+### Investigate a failing test
 
-Display the compiled query of the failing test:
+Add a singular test to verify that every order references an existing user.
 
 ```bash
-cat target/compiled/lab_medallion/models/silver/silver.yml/relationships_stg_users_state__code__ref_states_.sql
+cat > tests/assert_orders_have_users.sql <<'SQL'
+select
+    o.order_id,
+    o.user_id
+from {{ ref('stg_orders') }} o
+left join {{ ref('stg_users') }} u
+    on o.user_id = u.user_id
+where u.user_id is null
+SQL
 ```
 
-The `--store-failures` flag writes the rows returned by each test into a table of the `main_dbt_test__audit` schema:
+A singular test fails when its query returns rows.
+
+Run:
 
 ```bash
-uv run dbt test --select stg_users --store-failures
-#> ...
-#>   See test failures:
-#>   -------------------------------------------------------------------------------------------------------
-#>   select * from "lab_medallion"."main_dbt_test__audit"."relationships_stg_users_state__code__ref_states_"
-#>   -------------------------------------------------------------------------------------------------------
-duckdb -readonly lab_medallion.duckdb \
-  -c 'SELECT * FROM main_dbt_test__audit.relationships_stg_users_state__code__ref_states_'
-#> ┌────────────┐
-#> │ from_field │
-#> │  varchar   │
-#> ├────────────┤
-#> │ AE         │
-#> │ AE         │
-#> │ AE         │
-#> │ AP         │
-#> │ AP         │
-#> │ AA         │
-#> └────────────┘
-```
-
-`AA`, `AE` and `AP` are the codes of the military addresses: Armed Forces Americas, Europe and Pacific. The data is
-valid, the reference data is incomplete. Complete the seed, load it again and run the tests:
-
-```bash
-cat >> seeds/states.csv <<'CSV'
-AA,Armed Forces Americas,Military
-AE,Armed Forces Europe,Military
-AP,Armed Forces Pacific,Military
-CSV
-uv run dbt seed
-#> 1 of 1 OK loaded seed file main_reference.states ............................... [INSERT 62 in 0.04s]
 uv run dbt test --select silver
-#> Done. PASS=13 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=13
 ```
 
-A failing test does not always reveal invalid data: it reveals a wrong assumption, in the data or in the test.
+If the test fails, inspect the compiled query:
+
+```bash
+cat target/compiled/lab_medallion/tests/assert_orders_have_users.sql
+```
+
+Store the failing rows:
+
+```bash
+uv run dbt test --select silver --store-failures
+```
+
+Check the message printed and then inspect the failure table using DuckDB.
+
+```bash
+duckdb -readonly lab_medallion.duckdb
+```
+
+```sql
+SELECT * FROM "lab_medallion"."main_dbt_test__audit"."<failure_table_name>";
+-- ┌─────────────┬───────────┐
+-- │ value_field │ n_records │
+-- │   varchar   │   int64   │
+-- ├─────────────┼───────────┤
+-- │ donuts      │       824 │
+-- │ dring       │       824 │
+-- └─────────────┴───────────┘
+.quit
+```
+
+The important idea is:
+
+```text
+test query
+    │
+    ├── returns 0 rows → PASS
+    │
+    └── returns rows    → FAIL
+```
 
 ### Singular tests
 
@@ -710,201 +702,89 @@ Questions:
 - The addresses associate states with random zip codes, `KY 01352` for example. Which test would detect it, and which
   reference data would it require?
 
-## Gold layer
+## Full silver pipeline
 
-### Fact table
+`dbt build` combines model execution and testing.
 
-`fct_orders` joins the orders with the users and the states: each row is an order, enriched with the attributes needed
-by the analyses. It is materialized as an incremental table, the configuration in the model overrides the one of the
-`gold` directory.
+Remove the database:
 
 ```bash
-cat > models/gold/fct_orders.sql <<'SQL'
-{{
-    config(
-        materialized='incremental',
-        unique_key='order_id'
-    )
-}}
-
-select
-    o.order_id,
-    o.ordered_at,
-    cast(o.ordered_at as date) as order_date,
-    o.product,
-    o.quantity,
-    u.user_id,
-    u.state,
-    s.name as state_name,
-    s.region
-from {{ ref('stg_orders') }} o
-join {{ ref('stg_users') }} u on o.user_id = u.user_id
-left join {{ ref('states') }} s on u.state = s.code
-{% if is_incremental() %}
--- On incremental runs, only process the orders more recent than the latest order already loaded
-where o.ordered_at > (select max(ordered_at) from {{ this }})
-{% endif %}
-SQL
-uv run dbt run --select fct_orders
-#> 1 of 1 OK created sql incremental model main_gold.fct_orders ................... [OK in 0.12s]
+rm -f lab_medallion.duckdb
 ```
 
-On the first run, the table does not exist: `is_incremental()` returns false and the whole query is executed. Run the
-model a second time, and display the statements executed by dbt:
+Then:
 
 ```bash
-uv run dbt run --select fct_orders
-cat target/compiled/lab_medallion/models/gold/fct_orders.sql
-cat target/run/lab_medallion/models/gold/fct_orders.sql
+uv run dbt build --select silver
 ```
 
-The compiled query now contains the `where` clause, `{{ this }}` being replaced with the name of the existing table.
-dbt stores the result in a temporary table, deletes the rows of `fct_orders` whose `order_id` is present in it, then
-inserts the new rows. With `unique_key`, an order delivered twice replaces the previous version instead of being
-duplicated.
+dbt builds the models and executes their tests according to the dependency graph.
 
-The `--full-refresh` flag rebuilds the table from scratch, for example after a change of the logic:
+The pipeline is now:
 
-```bash
-uv run dbt run --select fct_orders --full-refresh
+```text
+                 ┌── stg_users ── tests
+S3 bronze ───────┤
+                 └── stg_orders ─ tests
 ```
-
-### Aggregate exported to S3
-
-`sales_by_region_month` aggregates the orders by month, region and product, for a sales dashboard. The `external`
-materialization of dbt-duckdb writes the result to a file instead of a table: the gold dataset is stored in the bucket
-in Parquet, readable by any engine.
-
-```bash
-cat > models/gold/sales_by_region_month.sql <<'SQL'
-{{
-    config(
-        materialized='external',
-        location="s3://" ~ env_var('LAB_BUCKET_NAME') ~ "/gold/sales_by_region_month.parquet"
-    )
-}}
-
-select
-    strftime(order_date, '%Y-%m') as month,
-    region,
-    product,
-    count(*) as orders,
-    count(distinct user_id) as customers,
-    cast(sum(quantity) as integer) as quantity
-from {{ ref('fct_orders') }}
-group by all
-order by all
-SQL
-uv run dbt run --select sales_by_region_month
-#> 1 of 1 OK created sql external model main_gold.sales_by_region_month ........... [OK in 0.06s]
-aws s3 --profile 'default' ls "s3://$LAB_BUCKET_NAME/gold/"
-#> 2026-09-17 16:33:02       2369 sales_by_region_month.parquet
-```
-
-In the database, dbt-duckdb creates a view on the Parquet file, so that downstream models can reference it with `ref()`.
-Query the file directly, without the database, and compare the result with the pivot of the DuckDB lab:
-
-```bash
-duckdb -c "
-  SELECT product, sum(quantity) AS quantity, sum(orders) AS orders
-  FROM 's3://$LAB_BUCKET_NAME/gold/sales_by_region_month.parquet'
-  WHERE month = '2020-01'
-  GROUP BY ALL
-  ORDER BY quantity DESC
-"
-#> ┌───────────┬──────────┬────────┐
-#> │  product  │ quantity │ orders │
-#> │  varchar  │  int128  │ int128 │
-#> ├───────────┼──────────┼────────┤
-#> │ donut     │      438 │    143 │
-#> │ brioche   │      431 │    133 │
-#> │ drink     │      377 │    118 │
-#> │ cookie    │      376 │    128 │
-#> │ croissant │      360 │    116 │
-#> │ bread     │      315 │    106 │
-#> └───────────┴──────────┴────────┘
-```
-
-Questions:
-
-- Why is the `quantity` column cast to an integer? Remove the cast, run the model, and look at the type in the Parquet
-  file.
-- The `customers` column counts distinct users. Can the dashboard sum it over several months? Over several products?
-- Each run overwrites the Parquet file. What happens to a dashboard reading it during the write? Which technology,
-  covered in the lakehouse modules, solves this issue?
-
-## Pipeline
-
-### Build
-
-`dbt build` runs the seeds, the models and the tests in the order of the dependency graph. The tests of a model run
-right after it, and the models depending on a failing test are skipped. Remove the database and build everything:
-
-```bash
-rm lab_medallion.duckdb
-uv run dbt build
-#> ...
-#> 3 of 19 OK loaded seed file main_reference.states .............................. [INSERT 62 in 0.08s]
-#> 2 of 19 OK created sql view model main_silver.stg_users ........................ [OK in 0.09s]
-#> 1 of 19 OK created sql view model main_silver.stg_orders ....................... [OK in 0.14s]
-#> ...
-#> 13 of 19 WARN 288 assert_orders_after_user_birth ............................... [WARN 288 in 0.07s]
-#> ...
-#> 18 of 19 OK created sql incremental model main_gold.fct_orders ................. [OK in 0.07s]
-#> 19 of 19 OK created sql external model main_gold.sales_by_region_month ......... [OK in 0.05s]
-#>
-#> Finished running 1 external model, 1 incremental model, 1 seed, 14 data tests, 2 view models in 0 hours 0 minutes and 0.57 seconds (0.57s).
-#>
-#> Completed with 1 warning:
-#> ...
-#> Done. PASS=18 WARN=1 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=19
-```
-
-To observe the protection offered by the tests, remove the 3 military rows from the seed and build again:
-
-```bash
-cp seeds/states.csv states.csv.bak
-head -n -3 states.csv.bak > seeds/states.csv
-uv run dbt build
-#> ...
-#> 8 of 19 FAIL 6 relationships_stg_users_state__code__ref_states_ ................ [FAIL 6 in 0.06s]
-#> ...
-#> 18 of 19 SKIP relation main_gold.fct_orders .................................... [SKIP]
-#> 19 of 19 SKIP relation main_gold.sales_by_region_month ......................... [SKIP]
-#> ...
-#> Done. PASS=15 WARN=1 ERROR=1 SKIP=2 NO-OP=0 REUSED=0 TOTAL=19
-mv states.csv.bak seeds/states.csv
-uv run dbt build
-```
-
-The gold layer is not refreshed: the dashboard displays the data of the previous successful run, instead of sales
-without region.
 
 ### Lineage
 
-dbt knows the dependencies between the resources from the `ref()` and `source()` calls. The selection syntax navigates
-the graph: `+model` selects a model and its ancestors, `model+` a model and its descendants.
+dbt knows dependencies through `source()` and `ref()`.
+
+List the models:
 
 ```bash
-uv run dbt ls -q --resource-type source seed model --select +sales_by_region_month
-#> lab_medallion.gold.fct_orders
-#> lab_medallion.gold.sales_by_region_month
-#> lab_medallion.silver.stg_orders
-#> lab_medallion.silver.stg_users
-#> lab_medallion.states
-#> source:lab_medallion.bronze.orders
-#> source:lab_medallion.bronze.users
-uv run dbt ls -q --resource-type model --output name --select stg_users+
-#> fct_orders
-#> sales_by_region_month
-#> stg_users
+uv run dbt ls -q --resource-type model
 ```
 
-Questions:
+List the complete graph leading to `stg_orders`:
 
-- Which command rebuilds `stg_orders` and all the models depending on it, and runs their tests?
-- A column of `users.csv` is renamed by the producer. Which models are impacted, and at which step does `dbt build`
-  fail?
+```bash
+uv run dbt ls -q --resource-type source model \
+  --select +stg_orders
+```
+
+You should see the bronze source and the silver model.
+
+The important distinction is:
+
+```jinja
+{{ source('bronze', 'orders') }}
+```
+
+means:
+
+```text
+external/raw dataset
+```
+
+while:
+
+```jinja
+{{ ref('stg_users') }}
+```
+
+means:
+
+```text
+another dbt resource
+```
+
+The dependency graph is therefore:
+
+```text
+source: bronze.users
+        │
+        ▼
+   stg_users
+
+
+source: bronze.orders
+        │
+        ▼
+   stg_orders
+```
 
 ### Documentation
 
@@ -920,7 +800,108 @@ Download `target/static_index.html` from the VSCode explorer (right-click, "Down
 Browse the models, their columns and tests, and click the lineage button in the bottom right corner to display the
 graph of the project.
 
-### Commit
+## Export the Silver Layer to Parquet
+
+So far, the silver models are materialized as DuckDB views. You can also export the result of a silver transformation as a Parquet file in the S3 bucket.
+
+### Create a Parquet export
+
+After building the `stg_users` model, open DuckDB:
+
+```bash
+uv run duckdb lab_medallion.duckdb
+```
+
+Then export the model to S3:
+
+```bash
+uv run duckdb lab_medallion.duckdb -c "
+COPY (
+    SELECT *
+    FROM main_silver.stg_users
+)
+TO 's3://$LAB_BUCKET_NAME/silver/dbt/users.parquet'
+(FORMAT parquet);
+"
+```
+
+Exit DuckDB:
+
+```sql
+.exit
+```
+
+You can verify that the file exists:
+
+```bash
+aws s3 ls s3://$LAB_BUCKET_NAME/silver/dbt/
+```
+
+You should see:
+
+```text
+silver/dbt/users.parquet
+```
+
+### Query the Parquet file directly
+
+DuckDB can query the Parquet file without importing it into the database:
+
+```bash
+uv run duckdb lab_medallion.duckdb -c "
+SELECT *
+FROM read_parquet('s3://$LAB_BUCKET_NAME/silver/dbt/users.parquet')
+LIMIT 10;
+"
+```
+
+You can also run an aggregation directly on the file:
+
+```bash
+uv run duckdb lab_medallion.duckdb -c "
+SELECT sex, count(*) AS users
+FROM read_parquet('s3://$LAB_BUCKET_NAME/silver/dbt/users.parquet')
+GROUP BY sex;
+"
+```
+
+### Compare the two approaches
+
+The same silver data can now be accessed in two ways:
+
+```text
+S3 Bronze CSV
+      │
+      ▼
+  dbt / DuckDB
+      │
+      ├──► DuckDB view
+      │
+      └──► S3 Silver Parquet
+```
+
+A **view** stores the SQL query. The transformation is executed when the view is queried.
+
+A **Parquet file** stores the transformed data. The transformation is performed once during the export, and subsequent queries read the materialized Parquet data.
+
+This illustrates the difference between **logical materialization** (view) and **physical materialization** (Parquet).
+
+### Exercise
+
+Export `stg_orders` as:
+
+```text
+s3://$LAB_BUCKET_NAME/silver/dbt/orders.parquet
+```
+
+Then query the Parquet file with DuckDB and compare its result with:
+
+```sql
+SELECT *
+FROM main_silver.stg_orders;
+```
+
+## Commit
 
 ```bash
 cd /home/onyxia/work/$GIT_REPO_NAME
@@ -934,20 +915,92 @@ Check that the `target/`, `logs/` directories and the `lab_medallion.duckdb` fil
 
 ## Exercises
 
-1. Create a `dim_users` model in the gold layer, one row per user, with the name of their state, their region, the
-   date of their first and last order, their number of orders and their total quantity. Declare `user_id` as unique and
-   not null, and check that the number of rows equals the number of users.
-2. Create a gold model answering a business question of your choice, such as the best-selling product per region, the
-   evolution of the quantity week after week, or the share of each product per hour of the day. It must reference the
-   upstream models with `ref()` only, apply at least 2 transformations beyond renaming columns (aggregation, derived
-   metric, join, window function), and be documented and tested in a `models/gold/gold.yml` file.
-3. Replace the warning of `assert_orders_after_user_birth` with a fix in the silver layer: the birthdate of a user is
-   set to `NULL` when it is later than their first order. Add a `birthdate_is_valid` boolean column, and verify that
-   the test passes.
-4. Add a singular test verifying that the total quantity of `sales_by_region_month` equals the total quantity of
-   `stg_orders`, so that no order is lost by the joins.
-5. The silver layer reads the CSV files from S3 on every query. Materialize the silver models as `external` Parquet
-   files in a `silver/` prefix of the bucket, and compare the execution time of `dbt build` before and after.
+### 1. Add a cleaned column
+
+Add a `username_normalized` column to `stg_users`.
+
+It should:
+
+- remove leading/trailing whitespace
+- convert the username to lowercase
+
+Document the column and add an appropriate test.
+
+### 2. Improve order validation
+
+Add tests for `stg_orders` to verify:
+
+- `quantity` is positive
+- `product` belongs to the expected list
+- every `user_id` exists in `stg_users`
+
+Use generic tests where possible and a singular test where necessary.
+
+### 3. Clean invalid birthdates
+
+Modify `stg_users` so that a birthdate later than the user's first order is replaced with `NULL`.
+
+Add:
+
+```text
+birthdate_is_valid
+```
+
+as a boolean column.
+
+The column should indicate whether the original birthdate passed the validation.
+
+Then modify:
+
+```text
+assert_orders_after_user_birth
+```
+
+so that the test passes.
+
+### 4. Detect invalid ZIP codes
+
+The generated addresses associate a state with a ZIP code.
+
+Create a data-quality test that detects inconsistent state/ZIP combinations.
+
+You will need reference data containing valid ZIP-code ranges or mappings.
+
+Consider:
+
+- Where should this reference data come from?
+- Should it be stored as a dbt seed?
+- Should the validation happen in the silver layer?
+- What happens when the reference data changes?
+
+### 5. Materialization experiment
+
+The silver models currently use views.
+
+Change the configuration temporarily:
+
+```yaml
+silver:
+  +materialized: table
+```
+
+Run:
+
+```bash
+uv run dbt build --select silver
+```
+
+Compare the two approaches.
+
+Consider:
+
+- Where is the data stored?
+- When is the transformation executed?
+- What happens when the underlying CSV changes?
+- Which approach requires more storage?
+- Which approach avoids re-reading the source files for every query?
+
+Restore the original configuration when finished.
 
 ## Cleanup
 
@@ -965,7 +1018,4 @@ layer and the seeds.
 
 ---
 
-_The content of this document, including all text, images, and associated materials, is the exclusive property of
-Adaltas and is protected by applicable copyright laws. Unauthorized distribution, reproduction, or sharing of this
-content, in whole or in part, is strictly prohibited without the express written consent of the author(s). Any violation
-of this restriction may result in legal action and the imposition of penalties as prescribed by law._
+_The content of this document, including all text, images, and associated materials, is the exclusive property of Adaltas and is protected by applicable copyright laws. Unauthorized distribution, reproduction, or sharing of this content, in whole or in part, is strictly prohibited without the express written consent of the author(s). Any violation of this restriction may result in legal action and the imposition of penalties as prescribed by law._
