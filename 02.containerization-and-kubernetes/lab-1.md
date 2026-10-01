@@ -162,7 +162,7 @@ kubectl scale deployments/kubernetes-bootcamp --replicas=5
    kubectl delete deployment $DEPLOYMENT_NAME
    ```
 
-2. Using the [deployment documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), fill out the blank (`TO COMPLETE #1`) in [`./lab/deployment.yaml`](./lab/deployment.yaml) to define a deployment based on the one we ran in part 2.
+2. Using the [deployment documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), fill out the blank (`TO COMPLETE #1`) in [`./lab-1/deployment.yaml`](./lab-1/deployment.yaml) to define a deployment based on the one we ran in part 2.
 
 3. Once you completed the file, run:
 
@@ -172,7 +172,7 @@ kubectl scale deployments/kubernetes-bootcamp --replicas=5
 
    Are the pods running?
 
-4. Using the [service documentation](https://kubernetes.io/docs/concepts/services-networking/service/), fill out the blank in [`./lab/service.yaml`](./lab/service.yaml)
+4. Using the [service documentation](https://kubernetes.io/docs/concepts/services-networking/service/), fill out the blank in [`./lab-1/service.yaml`](./lab-1/service.yaml)
 
 5. Once you completed the file, run:
 
@@ -182,7 +182,7 @@ kubectl scale deployments/kubernetes-bootcamp --replicas=5
 
    Can you access the service through your web browser?
 
-6. Fill out `TO COMPLETE #2` inside [`./lab/deployment.yaml`](./lab/deployment.yaml) to create 3 replicas of your app.
+6. Fill out `TO COMPLETE #2` inside [`./lab-1/deployment.yaml`](./lab-1/deployment.yaml) to create 3 replicas of your app.
 
 7. Once you completed the file, run:
 
