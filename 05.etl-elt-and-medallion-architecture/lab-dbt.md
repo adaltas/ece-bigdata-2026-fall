@@ -35,7 +35,6 @@ tags:
 - Declare the CSV datasets stored on S3 as the sources of the bronze layer
 - Build the silver layer: typed, cleaned and deduplicated models
 - Validate the data with generic and singular tests, and investigate the failures
-- Build the gold layer: an incremental fact table and an aggregate exported to S3 in Parquet
 - Run the whole pipeline with `dbt build` and explore its lineage
 
 ## Prerequisites
