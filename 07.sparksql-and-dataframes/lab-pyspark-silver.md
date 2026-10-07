@@ -40,10 +40,13 @@ tags:
 
 ## Prerequisites
 
-- The `vscode-pyspark` Onyxia service and the project of the [uv lab](../03.object-storage/lab-1-uv.md)
+- The `vscode-pyspark` Onyxia service with limits of `cpu: 4000m`, `memory 4000Mi`.
+- The project of the [uv lab](../03.object-storage/lab-1-uv.md)
 - The `bronze/users.csv` and `bronze/orders.csv` objects uploaded at the end of the [S3 lab](../03.object-storage/lab-2-s3.md)
 - The [dbt lab](./lab-dbt.md), which builds the same silver layer in SQL. Its output in `silver/` is used for the comparison at the end of this lab. If you removed it, run `uv run dbt build` again from the `lab_medallion` directory.
 - A network access to Maven Central: the Iceberg library is downloaded when the Spark session starts
+
+![setup Onyxia service](./assets/onyxia-vscode-resource.png)
 
 ## Environment
 
@@ -78,7 +81,7 @@ aws s3 --profile 'default' cp users.csv "s3://$LAB_BUCKET_NAME/bronze/users.csv"
 aws s3 --profile 'default' cp orders.csv "s3://$LAB_BUCKET_NAME/bronze/orders.csv"
 ```
 
-Then, in VS Code, use the kernel picker in the top-right corner of the notebook and select **Python (lab-pyspark uv)**. The versions of PySpark and of the Spark/Hadoop libraries already available in the `vscode-pyspark` image (`$SPARK_HOME/jars`) should be compatible. Check them, and note the Spark and Scala versions:
+The versions of PySpark and of the Spark/Hadoop libraries already available in the `vscode-pyspark` image (`$SPARK_HOME/jars`) should be compatible. Check them, and note the Spark and Scala versions:
 
 ```bash
 uv run pyspark --version
@@ -98,7 +101,7 @@ The session also declares an Iceberg catalog named `lab`, used at the end of the
 Launch PySpark shell.
 
 ```bash
-pyspark --master local[*] --packages org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.11.0
+pyspark --master local[*] --packages org.apache.iceberg:iceberg-spark-runtime-4.1_2.13:1.11.0
 ```
 
 The session runs in `local[*]` mode: the driver and the executors share a single JVM, on the machine of the Onyxia service. The code of this lab does not change on a cluster, only the way the session is created.

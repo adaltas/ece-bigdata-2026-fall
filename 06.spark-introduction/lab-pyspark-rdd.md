@@ -39,8 +39,6 @@ tags:
 
 ## Environment
 
-The lab is run from a Jupyter notebook in VS Code. Create a notebook named `lab-pyspark-rdd.ipynb` in your project. Each `python` block of this page is a cell of the notebook. Each `bash` block is a command to run in a terminal.
-
 RDDs operate on files, not on an object store: there is no `RDD` reader for S3A. Download the two bronze datasets once, and work on the local copies for the rest of the lab.
 
 ```bash
