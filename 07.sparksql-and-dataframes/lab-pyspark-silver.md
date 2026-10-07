@@ -46,7 +46,11 @@ tags:
 - The [dbt lab](./lab-dbt.md), which builds the same silver layer in SQL. Its output in `silver/` is used for the comparison at the end of this lab. If you removed it, run `uv run dbt build` again from the `lab_medallion` directory.
 - A network access to Maven Central: the Iceberg library is downloaded when the Spark session starts
 
-![setup Onyxia service](./assets/onyxia-vscode-resource.png)
+From service configuration using "Form":
+![setup Onyxia service](./assets/onyxia-vscode-resource-form.png)
+
+From service configuration using "Text Editor" line 27 - 29:
+![setup Onyxia service](./assets/onyxia-vscode-resource-text.png)
 
 ## Environment
 
