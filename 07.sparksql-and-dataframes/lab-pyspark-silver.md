@@ -94,7 +94,7 @@ ls $SPARK_HOME/jars | grep -i hadoop-aws
 
 If `hadoop-aws` is missing, the S3A configuration below fails with a `ClassNotFoundException`. In that case, add the matching jar with `spark.jars.packages` when building the session.
 
-Iceberg is a library added to Spark. Its runtime jar is named after the Spark and Scala versions, `iceberg-spark-runtime-<spark version>_<scala version>`, for example `iceberg-spark-runtime-4.0_2.13` for Spark 4.0 with Scala 2.13. Pick the artifact matching your versions and a release of Iceberg which supports them, from the [Iceberg documentation](https://iceberg.apache.org/multi-engine-support/).
+Iceberg is a library added to Spark. Its runtime jar is named after the Spark and Scala versions, `iceberg-spark-runtime-<spark version>_<scala version>`, for example `iceberg-spark-runtime-4.1_2.13` for Spark 4.1 with Scala 2.13. Pick the artifact matching your versions and a release of Iceberg which supports them, from the [Iceberg documentation](https://iceberg.apache.org/multi-engine-support/).
 
 ## SparkSession with S3 access
 
@@ -118,7 +118,7 @@ os.environ["LAB_BUCKET_NAME"] = os.environ["KUBERNETES_NAMESPACE"]
 BUCKET = os.environ["LAB_BUCKET_NAME"]
 
 # Adapt to the Spark and Scala versions of your environment
-ICEBERG_PACKAGE = "org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.11.0"
+ICEBERG_PACKAGE = "org.apache.iceberg:iceberg-spark-runtime-4.1_2.13:1.11.0"
 
 spark = (
     SparkSession.builder
