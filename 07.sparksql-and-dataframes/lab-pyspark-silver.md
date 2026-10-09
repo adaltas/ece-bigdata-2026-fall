@@ -476,6 +476,20 @@ Questions:
 - A second job overwrites the Parquet directory while a query is reading it. What does the reader see? What changes with an Iceberg table?
 - With this catalog, the pointer to the current version of a table is a file in the bucket. What can go wrong if two jobs commit at the same time, and what would a catalog service add?
 
+## Commit the Iceberg table
+
+Data files are not usually pushed to a Git remote repository. Only the metadata is collected, which keeps the commit small.
+
+```bash
+aws s3 --profile default sync "s3://$LAB_BUCKET_NAME/warehouse/" ./warehouse/
+
+git add \
+  ./warehouse/silver/orders/metadata \
+  ./warehouse/silver/users/metadata
+git commit -m "feat(spark-lab): add Iceberg table metadata"
+git push
+```
+
 ## Compare with the dbt lab
 
 Both labs build the same silver layer. Compare the results first.
