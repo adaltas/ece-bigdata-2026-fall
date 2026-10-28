@@ -35,7 +35,37 @@ This lab is a prerequisite for the [Polaris lab](./lab.md). It describes how to 
 
 ## Prerequisites
 
-- A `vscode-pyspark` service is running, and its terminal is open.
+- The `vscode-pyspark` Onyxia service with limits of `cpu: 2000m`, `memory 2500Mi`.
+
+```bash
+STATEFULSET_NAME="$(kubectl get statefulsets.apps -o=jsonpath='{.items[0].metadata.name}' -l app.kubernetes.io/name=vscode-pyspark)"
+kubectl patch statefulset $STATEFULSET_NAME \
+  -n $KUBERNETES_NAMESPACE \
+  --type='strategic' \
+  -p='{
+    "spec": {
+      "template": {
+        "spec": {
+          "containers": [{
+            "name": "vscode-pyspark",
+            "resources": {
+              "requests": {
+                "cpu": "50m",
+                "memory": "200Mi"
+              },
+              "limits": {
+                "cpu": "2000m"
+                ,"memory": "2500Mi"
+              }
+            }
+          }]
+        }
+      }
+    }
+  }'
+kubectl rollout status statefulset/$STATEFULSET_NAME -n $KUBERNETES_NAMESPACE
+```
+
 - The needed configuration files are created for Polaris deployment.
 
 ```bash
