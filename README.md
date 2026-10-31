@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This course introduces modern cloud-native big data architecture built entirely on Kubernetes. Students will gain end-to-end practical experience with distributed system, cloud-native data storage and processing mechanism, real-time streaming ingestion, medallion data lakehouse architecture, ETL/ELT data pipeline, and security.
+This course introduces modern cloud-native big data architecture built entirely on Kubernetes. Students will gain end-to-end practical experience with distributed system, cloud-native data storage and processing mechanism, medallion data lakehouse architecture, ETL/ELT data pipeline, processing engine, and data governance.
 
 ## Modules
 
@@ -50,135 +50,152 @@ Lab:
 - Configure access keys
 - Verify endpoint CRUD operations
 
-### Module 4: Medallion Architecture & ETL/ELT Dataflow (dbt)
+### Module 4: SQL analytics
 
 Course:
 
-- The Medallion Data Architecture (Bronze, Silver, Gold layers)
-- ELT vs. ETL paradigms
-- Analytics Engineering concepts
+- Warehouse, lake and lakehouse architectures
+- OLTP vs. OLAP, row vs. columnar storage
+- Dimensional modeling and analytical SQL
+- Parquet and DuckDB
 
 Lab:
 
-- Initialize a dbt (Data Build Tool) project
-- Write custom transformation models
-- Build aggregation logic
-- Implement data quality tests
+- Query S3 CSV datasets with DuckDB
+- Write aggregations, joins, window functions and pivots
+- Export to partitioned Parquet and compare with CSV
+- Run DuckDB from Python
 
-### Module 5: Distributed Computation Intro (Spark & Spark Operator)
+### Module 5: Medallion Architecture & ETL/ELT Dataflow (dbt)
 
 Course:
 
-- Apache Spark core architecture (Driver vs. Executors)
-- Kubernetes Custom Resource Definitions (CRDs)
+- ETL vs. ELT
+- Medallion architecture (Bronze, Silver, Gold)
+- Idempotency, incremental processing and data quality
+- Analytics engineering with dbt
 
 Lab:
 
-- Submit a Kubeflow Spark Operator SparkApplication manifest
-- Manage executor lifecycles
-- Configure automated Spark CronJobs
+- Set up a dbt project on DuckDB
+- Declare S3 CSV files as Bronze sources
+- Build cleaned Silver models
+- Add data tests and fix the failures
+- Export Silver to Parquet
 
-### Module 6: Event Streaming (Strimzi Kafka Operator & Debezium)
+### Module 6: Spark introduction
 
 Course:
 
-- Event-driven architectures
-- Kafka broker mechanics and Topic partitioning
-- Change Data Capture (CDC) via write-ahead log parsing
+- Spark architecture: driver, executors, cluster managers
+- RDDs, DataFrames and Datasets
+- Lazy evaluation, DAG and stages
+- Narrow vs. wide transformations and shuffles
 
 Lab:
 
-- Deploy a Kafka cluster via Strimzi CRDs
-- Provision a PostgreSQL connector via Debezium CDC
-- Produce and consume events
-- Verify stream offsets
+- Build and partition RDDs from the bronze datasets
+- Observe lazy evaluation in the Spark UI
+- Compare `reduceByKey` and `groupByKey`
+- Deduplicate and join key-value RDDs
 
-### Module 7: Real-Time Stream Processing with Structured Streaming
+### Module 7: Spark SQL & DataFrames
 
 Course:
 
-- Unbounded DataFrame abstractions
-- Micro-batching vs. continuous processing
-- Event-time semantics, watermarking, and fault recovery
+- RDD limits and DataFrame advantages
+- Catalyst optimizer
+- Schema management: inferred vs. explicit
+- PySpark internals, UDFs and tuning
 
 Lab:
 
-- Build and deploy a Spark Structured Streaming application
-- Consume live events from Kafka topics
-- Apply stateful transformations
-- Output results to a sink
+- Read bronze CSVs from S3 with PySpark
+- Build the silver layer with the DataFrame API and Spark SQL
+- Write the silver layer as Parquet and as Iceberg tables
+- Compare results with the dbt lab
 
-### Module 8: Data Orchestration Fundamentals (Apache NiFi/Hop)
+### Module 8: Iceberg introduction
 
 Course:
 
-- Flow-based programming concepts
-- Data provenance
-- Backpressure handling and connection routing strategies
+- Iceberg table format and metadata hierarchy
+- Partitioning and hidden partitioning
+- Schema evolution, time travel and row-level operations
+- Table maintenance
 
 Lab:
 
-- Navigate the Apache NiFi/Hop web UI
-- Configure source and sink processors
-- Construct a basic ingestion pipeline
+- Inspect an Iceberg table's files and metadata
+- Append data and explore snapshots
+- Query previous versions with time travel
+- Evolve the schema
+- Compare Iceberg with a plain Parquet directory
 
-### Module 9: Advanced Data Orchestration & Pipeline Integration
+### Module 9: Apache Polaris
 
 Course:
 
-- Enterprise ETL/ELT design patterns
-- Multi-stage routing and automated error recovery
-- Task scheduling and queue capacity monitoring
+- Iceberg REST catalog and Polaris APIs
+- Catalogs, namespaces, principals and roles
+- RBAC and credential vending
+- Data governance pillars
 
 Lab:
 
-- Construct an advanced NiFi/Hop workflow integrating Spark compute and Kafka streams
-- Feature automated retry paths and routing logic
-- Implement alert triggers
+- Connect Spark to Polaris through the REST API
+- Register an existing Iceberg table in Polaris
+- Create and alter tables as the `dev` principal
+- Check read-only access as the `analyst` principal
 
-### Module 10: Lakehouse Architecture Foundations & Query Engines
+### Module 10: Trino
 
 Course:
 
-- Introduction to the open lakehouse architecture
-- Apache Polaris REST Catalog specification
-- Federated querying over object stores with Trino
+- Trino architecture: coordinator, workers, connectors
+- Trino vs. Spark
+- Query execution and fault tolerance
+- Trino on Iceberg through Polaris
 
 Lab:
 
-- Interact with Apache Polaris via REST APIs
-- Manage catalog entities (namespaces, tables)
-- Execute basic SQL queries in Trino
+- Query the silver layer from Python through Polaris
+- Inspect Iceberg metadata and query plans
+- Build and validate gold tables with CTAS
+- Model the gold layer as a star schema
 
-### Module 11: Advanced Lakehouse Integration (Spark, Polaris, & Trino)
+### Module 11: Apache Hop
 
 Course:
 
-- Apache Iceberg table format mechanics (ACID transactions, snapshot isolation, time travel)
-- Cross-engine catalog integration
+- Hop concepts: transforms, actions, hops
+- Pipelines vs. workflows
+- Projects, environments and variables
+- Hop tools and essential transforms
 
 Lab:
 
-- Write a PySpark job to ingest data into Iceberg tables via the Polaris REST catalog
-- Run concurrent analytical queries via Spark SQL
-- Execute queries via Trino
+- Run Hop Web in Docker and create a project
+- Build the silver users pipeline visually
+- Route invalid rows to a quarantine file
+- Run the provided silver orders pipeline
 
-### Module 12: Cloud Security
+### Module 12: Apache Hop advanced
 
 Course:
 
-- Security pillars: identification, authentication, authorization
-- Role-Based Access Control (RBAC) and Identity & Access Management (IAM)
-- OAuth2/OIDC standards using Keycloak
-- Lightweight LDAP authentication using GLAuth
-- OPAL and Kafka
+- Error handling and quarantine
+- Workflows and orchestration
+- Variables, parameters and run configurations
+- Running and tuning Hop jobs
 
 Lab:
 
-- ServiceAccounts & token management
-- RBAC (Roles, RoleBindings, ClusterRoles)
-- NetworkPolicies and pod-to-pod isolation
-- Secrets management
+- Build the gold table with a Hop pipeline
+- Chain the pipelines in a workflow
+- Quarantine orders from unknown users
+- Run the workflow on S3 as a Kubernetes Job
+- Check idempotency on rerun
 
 ### Module 13: Cloud Migration
 
