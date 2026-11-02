@@ -137,7 +137,6 @@ The two levels separate concerns. The catalog owner decides what a `silver_reade
 | `TABLE_CREATE`           | Create tables                                                                                                                                                                |
 | `CATALOG_MANAGE_CONTENT` | Manage all the content of the catalog                                                                                                                                        |
 | `CATALOG_MANAGE_ACCESS`  | Grant and revoke privileges in the A catalog such as Polaris is part of the metadata and governance ecosystem, but it is not a general-purpose enterprise metadata platform. |
-| catalog                  |
 
 A possible mapping of the medallion layers:
 
