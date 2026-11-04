@@ -24,8 +24,6 @@ duration: 1 hour
 
 ## Trino vs Spark
 
-![Trino vs Spark](./assets/trino_vs_spark.png)
-
 | Criteria        | Trino                                          | Spark                                     |
 | --------------- | ---------------------------------------------- | ----------------------------------------- |
 | Main interface  | SQL                                            | Scala, Python, R, SQL, Java               |
