@@ -288,6 +288,30 @@ Questions:
 
 When the checks are done, set `POLARIS_PRINCIPAL` back to `"dev"` and restart the kernel for the next sections.
 
+## Commit the Iceberg table metadata
+
+Download the metadata from the `warehouse` directory in the s3 bucket.
+
+```bash
+aws s3 --profile default sync "s3://$LAB_BUCKET_NAME/warehouse/" ./warehouse/
+```
+
+Compare the difference in the Git repository, which files are added?
+
+```bash
+git status
+```
+
+Add the changes and commit to the remote repository.
+
+```bash
+git add \
+  ./warehouse/silver/orders/metadata \
+  ./warehouse/silver/users/metadata
+git commit -m "feat(polaris-lab): add Polaris table metadata"
+git push
+```
+
 ## Exercises
 
 1. Remove the `country` column from `polaris.silver.users` and check the change in the snapshots. Explain why the change is a metadata operation.
