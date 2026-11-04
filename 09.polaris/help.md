@@ -14,6 +14,9 @@ revisions:
   - date: 2026-10-26
     comment: Initial draft, Polaris configuration to be adapted once the cluster is deployed
     author: mori@adaltas.com
+  - date: 2026-11-03
+    comment: Update
+    author: elodine@adaltas.com
 tags:
   - name: TUTORIAL
 ---
@@ -25,10 +28,6 @@ Polaris reads its S3 credentials from environment variables, which are fixed whe
 ## Prerequisites
 
 - A `vscode-pyspark` service is running, and its terminal is open.
-- The course repository is cloned in the vscode filesystem.
-  ```bash
-  cd ~/work/courses/courses/bigdata/modules/09.polaris
-  ```
 - [Lab 1](./lab-1-deployment.md) is finished.
 
 ## Renew the S3 credentials locally
@@ -64,22 +63,11 @@ kubectl create secret generic polaris-s3 \
 Updating a secret does not change the environment of a running pod. Restart the Polaris deployment so the new pod reads the new values.
 
 ```bash
-kubectl rollout restart deployment/polaris
-kubectl rollout status deployment/polaris
-#> deployment "polaris" successfully rolled out
-```
-
-### Resource constraint
-
-If the new pod is stuck with resource constraint, try scale down first.
-
-```bash
 kubectl scale deployment/polaris --replicas=0
 kubectl scale deployment/polaris --replicas=1
 kubectl rollout status deployment/polaris
+#> deployment "polaris" successfully rolled out
 ```
-
-The Polaris entities (catalog, principals, roles and grants) are stored in PostgreSQL, so they survive the restart. The credentials of the `dev` and `analyst` principals are unchanged.
 
 ## Verify
 

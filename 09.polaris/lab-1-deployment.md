@@ -740,8 +740,8 @@ The Polaris module contains a Helm chart and a bootstrap Job that creates the re
 ```bash
 helm repo add polaris https://downloads.apache.org/polaris/helm-chart
 helm repo update
-helm dependency update ./deployment
-helm upgrade --install polaris ./deployment --wait
+helm dependency update polaris/deployment
+helm upgrade --install polaris polaris/deployment --wait
 ```
 
 Verify that Polaris is running.
@@ -856,12 +856,24 @@ curl -s "$API/catalogs/$POLARIS_CATALOG/catalog-roles" \
 #>       ...
 ```
 
+### Reset credentials for principal
+
+If the credential is lost, you could get a new credential through the following endpoint.
+
+```bash
+PRINCIPAL_RESET=<principal_name>
+curl -s -X POST "$API/principals/$PRINCIPAL_RESET/reset" \
+  -H "Authorization: Bearer $TOKEN" \
+| jq
+```
+
 ## Teardown
 
 The aim of this section is to show how to remove Polaris when it is no longer needed. For the next module, keep it.
 
 ```bash
 helm uninstall polaris
+helm repo remove polaris
 kubectl delete job polaris-bootstrap
 kubectl delete secret polaris-s3 polaris-credential
 kubectl delete configmap polaris-config
