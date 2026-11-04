@@ -231,7 +231,6 @@ Questions:
 4. Run `ALTER TABLE lakehouse.gold.top_products EXECUTE optimize`. List the snapshots and the files before and after, and explain what changed.
 5. Run the same aggregation of `orders_by_state_month` from the Spark session of the Spark lab, connected to Polaris, and compare the row counts of both results.
 
-
 ## Close the connection:
 
 ```python
@@ -256,7 +255,7 @@ Changes are committed to Git.
 ```bash
 git add \
   lab_trino \
-git commit -m "feat: trino gold metadata"
+git commit -m "feat(trino-lab): trino gold metadata"
 git push
 ```
 

@@ -180,7 +180,7 @@ echo "$LAB_BUCKET_NAME"
 #> user-gollum
 ```
 
-If the `AWS_*` environment variables are missing or outdated, refresh the `default` profile configuration and export them to the current shell. Refers to lab of [Object storage with S3](../03.object-storage/lab-2-s3.md#environment). Then update the credentials in Polaris pod too by following the related section in "[Help: update the s3 credential in Polaris pod (k8s)](../09.polaris/help.md#update-the-credentials-in-the-polaris-deployment)".
+If the `AWS_*` environment variables are missing or outdated, refresh the `default` profile configuration and export them to the current shell. Refers to lab of [Object storage with S3](../03.object-storage/lab-2-s3.md#environment). Then update the credentials in Polaris pod too by following the related section in "[Lab: update the s3 credential in Polaris pod (k8s)](../09.polaris/lab-3.md#update-the-credentials-in-the-polaris-deployment)".
 
 Check that the s3 bucket can be accessed.
 
@@ -196,7 +196,7 @@ Ensure that `/home/onyxia/.polaris-credentials.env` still exists and contents pr
 cat /home/onyxia/.polaris-credentials.env
 ```
 
-If the file still exists and contains polaris's credentials, run the command below.
+If the file still exists and contains polaris' credentials, run the command below.
 
 ```bash
 source /home/onyxia/.polaris-credentials.env
@@ -275,7 +275,7 @@ When Trino is no longer needed, remove the Trino and its resources.
 
 ```bash
 helm uninstall trino
-helm repo remove trino 
+helm repo remove trino
 kubectl delete secret trino-polaris-oauth
 kubectl delete configmap trino-polaris-config
 ```
