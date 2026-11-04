@@ -1,0 +1,548 @@
+---
+duration: 2h
+category:
+  - name: LAB
+components:
+  - name: TRINO
+  - name: ICEBERG
+  - name: POLARIS
+  - name: S3
+platforms:
+  - name: LINUX
+resources:
+  - title: Trino documentation
+    url: https://trino.io/docs/current/
+  - title: Trino, Iceberg connector
+    url: https://trino.io/docs/current/connector/iceberg.html
+  - title: Trino, EXPLAIN ANALYZE
+    url: https://trino.io/docs/current/sql/explain-analyze.html
+  - title: Trino Python client
+    url: https://github.com/trinodb/trino-python-client
+  - title: Apache Iceberg, REST catalog specification
+    url: https://iceberg.apache.org/rest-catalog-spec/
+revisions:
+  - date: 2026-10-08
+    comment: Initial page
+    author: mori@adaltas.com
+  - date: 2026-11-03
+    comment: Update
+    author: elodine@adaltas.com
+tags:
+  - name: TUTORIAL
+---
+
+# Lab: Silver to gold with Trino
+
+Build analytical tables with SQL.
+
+## Objectives
+
+- Connect to a Trino cluster from Python and run SQL against an Iceberg catalog
+- Locate the silver tables built by Spark, through the Polaris catalog
+- Read the Iceberg metadata of a table with SQL
+- Read the plan and the execution statistics of a query
+- Build the gold layer with `CREATE TABLE AS SELECT`
+- Validate the gold tables against the silver layer
+- Compare Trino and Spark for the same task
+
+## Prerequisites
+
+- The project of the [uv lab](../03.object-storage/lab-1-uv.md)
+- The [Spark lab](./07.sparksql-and-dataframes/lab-pyspark-silver.md), which builds the silver layer as Iceberg tables
+- The [Polaris lab](./09.polaris/lab-polaris.md), which exposes the silver layer through a Polaris catalog
+- The `vscode-pyspark` Onyxia service with default configuration.
+
+The Iceberg tables of the Spark lab are declared in a catalog of type `hadoop`, a directory in the bucket. Trino cannot read this type of catalog. Trino reads the silver tables through Polaris, so the tables must be registered there first. This is the job of the Polaris lab.
+
+The name `lakehouse` is the name of the catalog **in Trino**. It is not sent to Polaris, which only receives the `warehouse` value. The two names may differ.
+
+## Environment
+
+The lab is run in a Python shell. Each `python` block of this page is a executable command in the Python shell. Each `bash` block is a command to run in a terminal.
+
+Move into the project and install the Trino client:
+
+```bash
+# Define the name of your repo/directory accordingly
+GIT_REPO_NAME=<git-repo-name>
+cd /home/onyxia/work/$GIT_REPO_NAME
+export LAB_BUCKET_NAME="$KUBERNETES_NAMESPACE"
+echo "$LAB_BUCKET_NAME"
+#> user-gollum
+```
+
+If the `AWS_*` environment variables are missing or outdated, refresh the `default` profile configuration and export them to the current shell. Refers to lab of [Object storage with S3](../03.object-storage/lab-2-s3.md#environment).
+
+Check that the datasets are present in the bronze layer:
+
+```bash
+aws s3 --profile 'default' ls "s3://$LAB_BUCKET_NAME/bronze/"
+#> 2026-09-14 11:02:10     331568 orders.csv
+#> 2026-09-14 11:02:09       7351 users.csv
+```
+
+Set the connection parameters provided by the instructor:
+
+```bash
+export TRINO_HOST=trino
+export TRINO_PORT=8080
+export TRINO_USER=$KUBERNETES_NAMESPACE
+```
+
+Add dependencies to uv project and then launch a Python shell to run the SQL query against Trino.
+
+```bash
+uv add trino pandas
+uv run python
+```
+
+```python
+import os
+import pandas as pd
+import trino
+
+CATALOG = "lakehouse"
+
+conn = trino.dbapi.connect(
+    host=os.environ["TRINO_HOST"],
+    port=int(os.environ["TRINO_PORT"]),
+    user=os.environ["TRINO_USER"],
+    http_scheme="http",
+    catalog=CATALOG,
+    # Adapt the authentication to the Trino deployment, for example:
+    # auth=trino.auth.OAuth2Authentication(),
+)
+
+def sql(statement):
+    cur = conn.cursor()
+    cur.execute(statement)
+    rows = cur.fetchall()  # the query only completes when its results are fetched
+    columns = [c[0] for c in cur.description] if cur.description else []
+    return pd.DataFrame(rows, columns=columns)
+
+sql("SELECT version()")
+```
+
+The Trino Python client is lazy: `execute()` submits the statement, and the statement is only guaranteed to be finished once `fetchall()` returns. The helper always fetches, including for statements without a result such as `CREATE TABLE`.
+
+Questions:
+
+- What does the `catalog=` parameter of `connect()` change in the statements which follow?
+
+## Catalogs, schemas and tables
+
+Trino addresses data as `catalog.schema.table`. List what the cluster exposes:
+
+```python
+sql("SHOW CATALOGS")
+```
+
+The `lakehouse` catalog must be in the list. The `system` catalog is always present: it exposes the metadata of the cluster itself.
+
+```python
+sql("SHOW SCHEMAS FROM lakehouse")
+#>                Schema
+#> 0  information_schema
+#> 1              silver
+#> 2              system
+sql("SHOW TABLES FROM lakehouse.silver")
+#>     Table
+#> 0  orders
+#> 1   users
+```
+
+The `silver` schema is the Iceberg namespace created by Spark in Polaris. `information_schema` is a schema generated by Trino.
+
+If `silver` is missing or empty, the silver tables are not yet registered in Polaris. Go back to the Polaris lab.
+
+```python
+sql("DESCRIBE lakehouse.silver.orders")
+#>        Column                         Type Extra Comment
+#> 0    order_id                      varchar
+#> 1     user_id                      varchar
+#> 2  ordered_at  timestamp(6) with time zone
+#> 3    quantity                      integer
+#> 4     product                      varchar
+sql("DESCRIBE lakehouse.silver.users")
+#>       Column     Type Extra Comment
+#> 0    user_id  varchar
+#> 1   username  varchar
+#> 2       name  varchar
+#> 3        sex  varchar
+#> 4      email  varchar
+#> 5  birthdate     date
+#> 6     street  varchar
+#> 7       city  varchar
+#> 8      state  varchar
+#> 9   zip_code  varchar
+```
+
+Compare the types with the ones of the Spark lab. In particular, check the type of `ordered_at` and the type of `order_id`.
+
+Questions:
+
+- Trino types are not the Spark types. Which Trino type holds `ordered_at`? Does it keep a time zone?
+- The Spark lab declared `order_id` as a string because Spark has no `UUID` type. What does Trino report?
+
+## Query the silver layer
+
+Count the rows of the silver tables. The Spark lab produced 5000 orders after deduplication.
+
+```python
+sql("SELECT count(*) AS orders FROM lakehouse.silver.orders")
+#>    orders
+#> 0    5000
+sql("SELECT count(*) AS users FROM lakehouse.silver.users")
+#>    users
+#> 0     50
+```
+
+The number of users must be equal to the one of `users_iceberg.count()` in the Spark lab.
+
+Check the address parsing of the Spark lab, with the same query as in Spark SQL:
+
+```python
+sql("""
+    SELECT state,
+           count(*) AS users,
+           count_if(city IS NULL) AS missing_city
+    FROM lakehouse.silver.users
+    GROUP BY state
+    ORDER BY users DESC
+    LIMIT 10
+""")
+#>   state  users  missing_city
+#> 0    AE      3             3
+#> 1    FM      3             0
+#> 2    TX      2             0
+#> 3    DE      2             0
+#> 4    PA      2             0
+#> 5    VT      2             0
+#> 6    NJ      2             0
+#> 7    HI      2             0
+#> 8    VI      2             0
+#> 9    AP      2             2
+```
+
+`count_if()` is the Trino counterpart of `sum(CASE WHEN ... THEN 1 ELSE 0 END)` of the Spark lab. Check the consistency of the join keys before building the gold layer. An order without user would disappear from an inner join, silently:
+
+```python
+sql("""
+    SELECT count(*) AS orphan_orders
+    FROM lakehouse.silver.orders AS o
+    LEFT JOIN lakehouse.silver.users AS u ON u.user_id = o.user_id
+    WHERE u.user_id IS NULL
+""")
+```
+
+Questions:
+
+- Explain the output of the queries just run.
+- Which test of the dbt lab does the orphan query replace? What would you write to run it on every refresh?
+- Trino returned the results without a job to submit or a session to create. What does that tell about when to choose Trino instead of Spark?
+
+## Iceberg metadata
+
+The Iceberg connector exposes the metadata of each table as hidden tables, addressed with a `$` suffix and quoted:
+
+```python
+sql("""
+    SELECT snapshot_id, committed_at, operation
+    FROM lakehouse.silver."orders$snapshots"
+    ORDER BY committed_at
+""")
+#>            snapshot_id                  committed_at  operation
+#> 0  3142678218950516150 2026-10-05 11:07:10.236+00:00  overwrite
+#> 1  4224099754514104256 2026-10-06 15:04:48.642+00:00     append
+#> 2   157725160011647988 2026-10-06 15:06:47.458+00:00     append
+sql("""
+    SELECT file_path, file_format, record_count, file_size_in_bytes
+    FROM lakehouse.silver."orders$files"
+""")
+#>                                            file_path file_format  record_count  file_size_in_bytes
+#> 0  s3a://user-gollum/warehouse/silver/orders/data/0...     PARQUET          5000              143651
+#> 1  s3a://user-gollum/warehouse/silver/orders/data/0...     PARQUET             1                2194
+#> 2  s3a://user-gollum/warehouse/silver/orders/data/0...     PARQUET             3                1997
+```
+
+These are the same information as `lab.silver.orders.snapshots` and `.files` in Spark. Trino and Spark read them from the same metadata, held in the bucket and located by Polaris.
+
+Other metadata tables, such as `"orders$history"` and `"orders$manifests"`, are available.
+
+```python
+sql('SELECT * FROM lakehouse.silver."orders$history"')
+#>                 made_current_at          snapshot_id     parent_id  is_current_ancestor
+#> 0 2026-10-05 11:07:10.236+00:00  3142678218950516150           NaN                 True
+#> 1 2026-10-06 15:04:48.642+00:00  4224099754514104256  3.142678e+18                 True
+#> 2 2026-10-06 15:06:47.458+00:00   157725160011647988  4.224100e+18                 True
+```
+
+Questions:
+
+- How many snapshots does `silver.orders` have? Which engine wrote them?
+- List the files of the table with `aws s3 ls`, and compare with the `$files` table. Which one does not need access to the bucket, and why?
+
+## Query plan and execution
+
+A query is split into stages, run by tasks on the workers. Display the distributed plan of the join between orders and users:
+
+```python
+plan = sql("""
+    EXPLAIN (TYPE DISTRIBUTED)
+    SELECT u.state, count(*) AS orders
+    FROM lakehouse.silver.orders AS o
+    JOIN lakehouse.silver.users  AS u ON u.user_id = o.user_id
+    GROUP BY u.state
+""")
+print(plan.iloc[0, 0])
+```
+
+In the output, identify:
+
+- the **fragments**, one per stage
+- the `TableScan` operators, one per table
+- the **exchanges** between the fragments, `REMOTE` for the ones crossing the network
+- the type of the join, `PARTITIONED` or `REPLICATED` (broadcast)
+
+Run the same query with `EXPLAIN ANALYZE` to get the execution statistics:
+
+```python
+stats = sql("""
+    EXPLAIN ANALYZE
+    SELECT u.state, count(*) AS orders
+    FROM lakehouse.silver.orders AS o
+    JOIN lakehouse.silver.users  AS u ON u.user_id = o.user_id
+    GROUP BY u.state
+""")
+print(stats.iloc[0, 0])
+```
+
+Each fragment reports the number of input rows, the CPU time and the peak memory. Look at the history of the queries you ran:
+
+```python
+sql("""
+    SELECT query_id, state, date_diff('millisecond', created, coalesce("end", current_timestamp)) AS elapsed_ms, query
+    FROM system.runtime.queries
+    ORDER BY created DESC
+    LIMIT 5
+""")
+```
+
+The coordinator also provides a web interface at `https://<trino-host>/ui`. Open the page of one of the queries and find its stages.
+
+If `system.runtime.queries` is denied, the access control of the cluster restricts the system catalog. Use the web interface instead.
+
+Questions:
+
+- Which table is broadcast to the workers in the join, and why is it the right choice?
+- The Spark lab states that a window function triggers a shuffle. Where is the equivalent of the shuffle in the Trino plan?
+- Which statistics of `EXPLAIN ANALYZE` would you look at first for a query which is slower than expected?
+
+## Gold layer
+
+The silver layer is clean and typed. The gold layer is aggregated and business-oriented, ready for BI tools. Each gold table is an Iceberg table built with a `CREATE TABLE AS SELECT`, registered in Polaris, in a `gold` namespace.
+
+```python
+sql("CREATE SCHEMA IF NOT EXISTS lakehouse.gold")
+```
+
+If the statement fails with a message mentioning authorization or access denied, the principal used by Trino lacks a write grant in Polaris. The failure may also be silent, with the schema missing afterwards. Run `SHOW SCHEMAS FROM lakehouse` to check, and ask the instructor.
+
+### Orders by state and month
+
+```python
+sql("""
+    CREATE TABLE lakehouse.gold.orders_by_state_month AS
+    SELECT
+        u.state,
+        date_trunc('month', o.ordered_at) AS month,
+        count(*)                          AS orders,
+        sum(o.quantity)                   AS units,
+        count(DISTINCT o.user_id)         AS buyers
+    FROM lakehouse.silver.orders AS o
+    JOIN lakehouse.silver.users  AS u ON u.user_id = o.user_id
+    GROUP BY 1, 2
+""")
+
+sql("SELECT * FROM lakehouse.gold.orders_by_state_month ORDER BY month, state LIMIT 10")
+#>   state                     month  orders  units  buyers
+#> 0    AA 2020-01-01 00:00:00+00:00     101    313       1
+#> 1    AE 2020-01-01 00:00:00+00:00     300    874       3
+#> ...
+```
+
+The result of a `CREATE TABLE AS SELECT` is the number of rows written.
+
+### Best-selling products
+
+```python
+sql("""
+    CREATE TABLE lakehouse.gold.top_products AS
+    SELECT
+        product,
+        count(*)      AS orders,
+        sum(quantity) AS units,
+        rank() OVER (ORDER BY sum(quantity) DESC) AS units_rank
+    FROM lakehouse.silver.orders
+    GROUP BY product
+""")
+
+sql("SELECT * FROM lakehouse.gold.top_products ORDER BY units_rank LIMIT 10")
+#>      product  orders  units  units_rank
+#> 0  croissant     883   2645           1
+#> 1  ...
+```
+
+### Activity of each user
+
+A `LEFT JOIN` from the users keeps the users who never ordered.
+
+```python
+sql("""
+    CREATE TABLE lakehouse.gold.user_activity AS
+    SELECT
+        u.user_id,
+        u.state,
+        date_diff('year', u.birthdate, current_date) AS age,
+        count(o.order_id)        AS orders,
+        coalesce(sum(o.quantity), 0) AS units,
+        min(o.ordered_at)        AS first_order_at,
+        max(o.ordered_at)        AS last_order_at
+    FROM lakehouse.silver.users AS u
+    LEFT JOIN lakehouse.silver.orders AS o ON o.user_id = u.user_id
+    GROUP BY u.user_id, u.state, u.birthdate
+""")
+
+sql("SELECT * FROM lakehouse.gold.user_activity ORDER BY orders DESC LIMIT 10")
+#>                                 user_id state  age  orders  units                   first_order_at                    last_order_at
+#> 0  832920b7-c143-4426-b72f-871a45ee432d    HI   51     102    280 2020-01-01 00:43:06.694678+00:00 2020-01-05 03:28:02.473785+00:00
+#> 1  ...
+```
+
+List the tables of the gold schema, and the files of one of them:
+
+```python
+sql("SHOW TABLES FROM lakehouse.gold")
+sql("""
+    SELECT file_path, record_count, file_size_in_bytes
+    FROM lakehouse.gold."top_products$files"
+""")
+```
+
+Questions:
+
+- Why does `user_activity` use a `LEFT JOIN` while `orders_by_state_month` uses an inner join? Which one depends on the result of the orphan query?
+- `current_date` makes `age` change each day. What does it imply for the refresh of the table?
+- Where do the data files of the gold tables live, and who decided their location?
+
+## Validation
+
+The Spark lab validated its outputs with `assert`. Validate the gold layer the same way, by comparing the aggregates with the silver layer:
+
+```python
+silver_units = sql("SELECT sum(quantity) AS v FROM lakehouse.silver.orders").iloc[0, 0]
+gold_units = sql("SELECT sum(units) AS v FROM lakehouse.gold.orders_by_state_month").iloc[0, 0]
+product_units = sql("SELECT sum(units) AS v FROM lakehouse.gold.top_products").iloc[0, 0]
+
+# You won't see AssertionError with those cmds.
+assert silver_units == gold_units
+assert silver_units == product_units
+```
+
+```python
+silver_users = sql("SELECT count(*) AS v FROM lakehouse.silver.users").iloc[0, 0]
+gold_users = sql("SELECT count(*) AS v FROM lakehouse.gold.user_activity").iloc[0, 0]
+silver_orders = sql("SELECT count(*) AS v FROM lakehouse.silver.orders").iloc[0, 0]
+gold_orders = sql("SELECT sum(orders) AS v FROM lakehouse.gold.user_activity").iloc[0, 0]
+
+assert silver_users == gold_users
+assert silver_orders == gold_orders
+```
+
+Questions:
+
+- Which defect of the silver layer would one of these assertions catch, and which would pass unnoticed?
+- The first assertion fails if an order has no matching user. Is it a bug of the gold layer or of the silver layer?
+
+## Refresh a gold table
+
+A gold table must follow the silver layer. Iceberg tables accept `INSERT`, `DELETE` and `MERGE`, with a snapshot committed for each statement. Replace the content of `top_products`:
+
+```python
+sql("DELETE FROM lakehouse.gold.top_products")
+sql("""
+    INSERT INTO lakehouse.gold.top_products
+    SELECT product, count(*), sum(quantity),
+           rank() OVER (ORDER BY sum(quantity) DESC)
+    FROM lakehouse.silver.orders
+    GROUP BY product
+""")
+
+sql("""
+    SELECT snapshot_id, committed_at, operation
+    FROM lakehouse.gold."top_products$snapshots"
+    ORDER BY committed_at
+""")
+```
+
+Read the table as it was after its creation, with time travel:
+
+```python
+first = sql("""
+    SELECT snapshot_id
+    FROM lakehouse.gold."top_products$snapshots"
+    ORDER BY committed_at
+    LIMIT 1
+""").iloc[0, 0]
+
+sql(f"SELECT count(*) AS products FROM lakehouse.gold.top_products FOR VERSION AS OF {first}")
+sql("SELECT count(*) AS products FROM lakehouse.gold.top_products")
+```
+
+Questions:
+
+- How many snapshots does the table have after the refresh, and what is the `operation` of each?
+- Between the `DELETE` and the `INSERT`, a dashboard reads the table. What does it see? What would change with a `MERGE`?
+- Compare with the Parquet directory of the Spark lab, overwritten while a query reads it.
+
+## Compare with Spark
+
+The same gold table can be built in the Spark session of the previous lab, once it is connected to the Polaris catalog. Compare the two engines on this task, by looking at the code and at the behavior, and not at the duration.
+
+Questions:
+
+- What does each engine need to run the `top_products` query, beyond the query itself: a session, a package, credentials, a job?
+- The silver layer of the Spark lab was written by a distributed job and read by Trino. What do both engines share, and what do they not know about each other?
+- For each of these cases, would you choose Trino or Spark: a dashboard refreshed every minute on the gold layer, a nightly transformation of 10 TB of bronze files, a data scientist exploring the silver layer with a query.
+- Trino fails the whole query when a worker is lost, unless fault-tolerant execution is enabled. Why is it acceptable for the queries of this lab, and not for a transformation of 10 TB?
+
+## Exercises
+
+1. Create a table `gold.orders_by_state_month_part` with `WITH (partitioning = ARRAY['month(month)'])`. List its files and compare with the unpartitioned table. Run a query filtering on one month and compare the input rows in `EXPLAIN ANALYZE`.
+2. Write a gold table `gold.cohorts` giving, for each decade of birth, the number of users, the number of orders and the average number of units per order.
+3. Append one order to `silver.orders` with `INSERT INTO`, refresh `gold.orders_by_state_month` with a `MERGE`, and read the previous state of the gold table with `FOR VERSION AS OF`.
+4. Run `ALTER TABLE lakehouse.gold.top_products EXECUTE optimize`. List the snapshots and the files before and after, and explain what changed.
+5. Run the same aggregation of `orders_by_state_month` from the Spark session of the Spark lab, connected to Polaris, and compare the row counts of both results.
+
+## Commit
+
+Changes are committed to Git.
+
+```bash
+git add \
+  pyproject.toml \
+  uv.lock
+git commit -m "feat: trino dependency added"
+git push
+```
+
+## End note
+
+The Trino connection should not be closed for the usage of the following lab.
+
+---
+
+_The content of this document, including all text, images, and associated materials, is the exclusive property of
+Adaltas and is protected by applicable copyright laws. Unauthorized distribution, reproduction, or sharing of this
+content, in whole or in part, is strictly prohibited without the express written consent of the author(s). Any
+violation of this restriction may result in legal action and the imposition of penalties as prescribed by law._
