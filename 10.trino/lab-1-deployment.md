@@ -180,7 +180,7 @@ echo "$LAB_BUCKET_NAME"
 #> user-gollum
 ```
 
-If the `AWS_*` environment variables are missing or outdated, refresh the `default` profile configuration and export them to the current shell. Refers to lab of [Object storage with S3](../03.object-storage/lab-2-s3.md#environment). Then update the credentials in Polaris pod too by following the related section in "[Lab: update the s3 credential in Polaris pod (k8s)](../09.polaris/lab-3.md#update-the-credentials-in-the-polaris-deployment)".
+If the `AWS_*` environment variables are missing or outdated, refresh the `default` profile configuration and export them to the current shell. Refers to lab of [Object storage with S3](../03.object-storage/lab-2-s3.md#environment). Then update the credentials in Polaris pod too by following the related section in "[Help: update the s3 credential in Polaris pod (k8s)](../09.polaris/help.md#update-the-credentials-in-the-polaris-deployment)".
 
 Check that the s3 bucket can be accessed.
 

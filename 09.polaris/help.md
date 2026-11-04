@@ -21,7 +21,7 @@ tags:
   - name: TUTORIAL
 ---
 
-# Lab: update the s3 credential in Polaris pod (k8s)
+# Help: update the s3 credential in Polaris pod (k8s)
 
 Polaris reads its S3 credentials from environment variables, which are fixed when the pod starts. This lab shows how to refresh them when they expire, without losing the catalog.
 
