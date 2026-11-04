@@ -4,11 +4,6 @@ duration: 1 hour
 
 # Trino introduction
 
-## Trino in the data ecosystem
-
-![https://trino.io/episodes/21.html](./assets/trino_ecosystem_01.png)
-![https://trino.io/episodes/33.html](./assets/trino_ecosystem_02.png)
-
 ## What is Trino
 
 - Fast, distributed (parallel), **SQL query engine** for analytics
