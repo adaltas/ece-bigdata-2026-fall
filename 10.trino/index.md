@@ -6,25 +6,26 @@ duration: 1 hour
 
 ## Trino in the data ecosystem
 
-![Trino in the data ecosystem](./assets/trino_ecosystem.png)
+![https://trino.io/episodes/21.html](./assets/trino_ecosystem_01.png)
+![https://trino.io/episodes/33.html](./assets/trino_ecosystem_02.png)
 
 ## What is Trino
 
 - Fast, distributed (parallel), **SQL query engine** for analytics
-- **Open Source** project [trino.io](https://trino.io/docs/current/) (Apache License 2.0)
-- Originally created at **Facebook** (Presto, 2012), forked and renamed **Trino** in 2020 by the original creators
-- Written in **Java** → runs in the JVM (Java Virtual Machine)
-- One language: **ANSI SQL** — clients exist for CLI, JDBC, Python, and BI tools
-- **MPP** (Massively Parallel Processing) architecture: queries are split into **tasks** run in parallel on **worker nodes**
-- **Not a database**: no storage of its own, data stays in the source systems
-- Designed for **interactive analytics** (seconds to minutes), not for OLTP
+- Open Source project [trino.io](https://trino.io/docs/current/) (Apache License 2.0)
+- Originally created at Facebook (Presto, 2012), forked and renamed Trino in 2020 by the original creators
+- Written in Java → runs in the JVM (Java Virtual Machine)
+- One language: ANSI SQL — clients exist for CLI, JDBC, Python, and BI tools
+- MPP (Massively Parallel Processing) architecture: queries are split into tasks run in parallel on worker nodes
+- Not a database: no storage of its own, data stays in the source systems
+- Designed for interactive analytics (seconds to minutes), not for OLTP
 
 ## Use cases
 
-- **Interactive analytics** on very large datasets stored in an object store (S3) or HDFS
-- **Federated queries**: join data across heterogeneous sources in a single SQL statement (Iceberg, PostgreSQL, Kafka, ...)
-- **ETL / ELT** with SQL: `CREATE TABLE AS`, `INSERT`, `MERGE` to build silver and gold layers
-- **Lakehouse query layer**: serve BI tools and data analysts on Iceberg tables
+- Interactive analytics on very large datasets stored in an object store (S3) or HDFS
+- Federated queries: join data across heterogeneous sources in a single SQL statement (Iceberg, PostgreSQL, Kafka, ...)
+- ETL / ELT with SQL: `CREATE TABLE AS`, `INSERT`, `MERGE` to build silver and gold layers
+- Lakehouse query layer: serve BI tools and data analysts on Iceberg tables
 
 ## Trino vs Spark
 
@@ -42,7 +43,7 @@ duration: 1 hour
 
 ## Architecture
 
-## Trino architecture
+### Trino architecture
 
 ![Trino architecture overview. Diagram from Trino: The Definitive Guide, by Matt Fuller, Manfred Moser, and Martin Traverso. Public domain according to Wikimedia Commons.](./assets/Figure_4-1_Trino_architecture.png)
 
@@ -70,8 +71,8 @@ Workers execute the tasks created by the coordinator.
 
 Its responsibilities include:
 
-- execute **tasks** assigned by the coordinator
-- read data from sources through **connectors**
+- execute tasks assigned by the coordinator
+- read data from sources through connectors
 - exchange intermediate results with other workers
 
 ```text
@@ -112,58 +113,46 @@ catalog.schema.table
 
 - Connector: plugin that knows how to read (and sometimes write) one type of data source
 - [Catalog](https://trino.io/docs/current/overview/concepts.html#catalog): a configured instance of a connector, defined by a `.properties` file
-- [Schema](https://trino.io/docs/current/overview/concepts.html#schema): a set of tables inside a catalog (a database in PostgreSQL, a namespace in Iceberg)
+- [Schema](https://trino.io/docs/current/overview/concepts.html#schema): a set of tables inside a catalog (a schema in PostgreSQL, or a namespace in Iceberg)
 - [Tables](https://trino.io/docs/current/overview/concepts.html#table): the data itself, exposed as rows and columns
 
 This three-level structure perfectly matches with [PostgreSQL](https://trino.io/docs/current/connector/postgresql.html#configuration) as it is a three-level architecture (it owns schemas and tables). For example, a table named `orders` located inside the native `public` schema of the `sales_db` database is queried via `postgres_prod.public.orders` with the below associated sample catalog configuration. The catalog name `postgres_prod` refers to the database `sales_db`.
 
 ```sql
 SHOW CATALOGS;
-SHOW SCHEMAS FROM sales_db;
-SHOW TABLES FROM sales_db.public;
-SELECT * FROM sales_db.public.orders LIMIT 10;
+SHOW SCHEMAS FROM postgres_prod;
+SHOW TABLES FROM postgres_prod.public;
+SELECT * FROM postgres_prod.public.orders LIMIT 10;
 ```
 
 Common connectors: **Iceberg**, Hive, Delta Lake, PostgreSQL, MySQL, Kafka, MongoDB, TPC-H (benchmark data).
 
 ## Query execution
 
-![Trino query execution](./assets/trino_query_execution.png)
-
 When a query statement is submitted, Trino:
 
-1. **Parses** the SQL and **analyzes** it (tables, columns, types, permissions)
-2. Builds a **logical plan** and **optimizes** it (cost-based optimizer)
-3. Splits the plan into **stages** (**fragments**)
-4. Each stage is run as **tasks** distributed over a network of Trino workers
-5. Tasks process **splits**, chunks of data read from the source
-6. Results flow between stages through **exchanges**, then back to the client
+1. Parses the SQL and analyzes it (tables, columns, types, permissions)
+2. Builds a logical plan and optimizes it (cost-based optimizer)
+3. Splits the plan into stages (fragments)
+4. Each stage is run as tasks distributed over a network of Trino workers
+5. Tasks process splits, chunks of data read from the source
+6. Results flow between stages through exchanges, then back to the client
 
-| Concept    | Description                                                                |
-| ---------- | -------------------------------------------------------------------------- |
-| **Query**  | One SQL statement, executed across the cluster                             |
-| **Stage**  | A fragment of the plan; stages form a tree, the root stage returns results |
-| **Task**   | A stage instance running on a worker                                       |
-| **Split**  | A unit of data (e.g. a part of a Parquet file) processed by a task         |
-| **Driver** | A pipeline of operators processing a split inside a task                   |
-
-- Data is **pipelined** between stages in memory: no intermediate write to disk by default
-- **Exchanges** (shuffles over the network) are the main cost of distributed joins and aggregations
-- Optimizations: **predicate pushdown**, **column pruning**, **partition pruning**, join reordering
+- Data is pipelined between stages in memory: no intermediate write to disk by default
+- Exchanges (shuffles over the network) are the main cost of distributed joins and aggregations
+- Optimizations: predicate pushdown, column pruning, partition pruning, join reordering
 
 ## Fault tolerance
 
-- By default, a worker failure **fails the query**: it must be re-run from the beginning
+- By default, a worker failure fails the query: it must be re-run from the beginning
   - Acceptable for short interactive queries, costly for long ETL queries
-- **Fault-tolerant execution** (opt-in) retries failed tasks or whole queries:
+- Fault-tolerant execution (opt-in) retries failed tasks or whole queries:
   - `retry-policy=TASK` or `retry-policy=QUERY`
-  - requires an **exchange manager** that spools intermediate data to external storage (S3)
+  - requires an exchange manager that spools intermediate data to external storage (S3)
 
 ## Trino on Iceberg
 
-![Trino and Iceberg](./assets/trino_iceberg.png)
-
-The **Iceberg connector** lets Trino read and write Iceberg tables. The table metadata is managed by an Iceberg **catalog**; the course uses **Apache Polaris** through the Iceberg **REST catalog** protocol. Data files stay in S3.
+The Iceberg connector lets Trino read and write Iceberg tables. The table metadata is managed by an Iceberg catalog; the course uses Apache Polaris through the Iceberg REST catalog protocol. Data files stay in S3.
 
 ```properties
 # etc/catalog/lakehouse.properties
@@ -180,13 +169,13 @@ s3.path-style-access=true
 s3.region=<s3_region>
 ```
 
-- Trino authenticates to Polaris with **OAuth2** (client credentials): permissions are enforced by the Polaris roles
-- Trino reads and writes the data files in S3 directly with its **native S3 file system**
+- Trino authenticates to Polaris with OAuth2 (client credentials): permissions are enforced by the Polaris roles
+- Trino reads and writes the data files in S3 directly with its native S3 file system
 - Iceberg features available from SQL:
-  - **ACID** writes: `INSERT`, `UPDATE`, `DELETE`, `MERGE`
-  - **Time travel**: query a previous snapshot
-  - **Metadata tables**: `"table$snapshots"`, `"table$files"`, `"table$history"`
-  - **Maintenance**: `ALTER TABLE ... EXECUTE optimize`, `expire_snapshots`
+  - ACID writes: `INSERT`, `UPDATE`, `DELETE`, `MERGE`
+  - Time travel: query a previous snapshot
+  - Metadata tables: `"table$snapshots"`, `"table$files"`, `"table$history"`
+  - Maintenance: `ALTER TABLE ... EXECUTE optimize`, `expire_snapshots`
 
 ```sql
 -- Snapshots of a table
@@ -200,9 +189,7 @@ FROM lakehouse.silver.orders FOR VERSION AS OF 1234567890123456789;
 
 ## From silver to gold
 
-![Silver to gold with Trino](./assets/trino_silver_to_gold.png)
-
-In the medallion architecture, Trino builds the **gold** layer from the **silver** layer with plain SQL:
+In the medallion architecture, Trino builds the gold layer from the silver layer with plain SQL:
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS lakehouse.gold;
@@ -218,8 +205,8 @@ JOIN lakehouse.silver.users  AS u ON u.user_id = o.user_id
 GROUP BY 1, 2;
 ```
 
-- The result is a new **Iceberg table**, readable by any engine connected to the same catalog
-- Gold tables are **aggregated**, business-oriented and ready for BI tools
+- The result is a new Iceberg table, readable by any engine connected to the same catalog
+- Gold tables are aggregated, business-oriented and ready for BI tools
 - To refresh a gold table, use `INSERT`, `MERGE` or `CREATE OR REPLACE TABLE`
 
 ## References
