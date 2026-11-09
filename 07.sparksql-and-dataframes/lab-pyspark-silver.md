@@ -40,17 +40,51 @@ tags:
 
 ## Prerequisites
 
-- The `vscode-pyspark` Onyxia service with limits of `cpu: 4000m`, `memory 4000Mi`.
 - The project of the [uv lab](../03.object-storage/lab-1-uv.md)
 - The `bronze/users.csv` and `bronze/orders.csv` objects uploaded at the end of the [S3 lab](../03.object-storage/lab-2-s3.md)
 - The [dbt lab](./lab-dbt.md), which builds the same silver layer in SQL. Its output in `silver/` is used for the comparison at the end of this lab. If you removed it, run `uv run dbt build` again from the `lab_medallion` directory.
 - A network access to Maven Central: the Iceberg library is downloaded when the Spark session starts
+- Environment variables containing the current S3 credentials.
+- The `vscode-pyspark` Onyxia service with limits of `cpu: 4000m`, `memory 4000Mi`.
 
-From service configuration using "Form":
+For a new `vscode-pyspark` service, from service configuration using "Form":
+
 ![setup Onyxia service](./assets/onyxia-vscode-resource-form.png)
 
-From service configuration using "Text Editor" line 27 - 29:
+For a new `vscode-pyspark` service, from service configuration using "Text Editor" line 27 - 29:
+
 ![setup Onyxia service](./assets/onyxia-vscode-resource-text.png)
+
+For an existing `vscode-pyspark` service, from Vscode terminal
+
+```bash
+STATEFULSET_NAME="$(kubectl get statefulsets.apps -o=jsonpath='{.items[0].metadata.name}' -l app.kubernetes.io/name=vscode-pyspark)"
+kubectl patch statefulset $STATEFULSET_NAME \
+  -n $KUBERNETES_NAMESPACE \
+  --type='strategic' \
+  -p='{
+    "spec": {
+      "template": {
+        "spec": {
+          "containers": [{
+            "name": "vscode-pyspark",
+            "resources": {
+              "requests": {
+                "cpu": "200m",
+                "memory": "1Gi"
+              },
+              "limits": {
+                "cpu": "4"
+                ,"memory": "4Gi"
+              }
+            }
+          }]
+        }
+      }
+    }
+  }'
+kubectl rollout status statefulset/$STATEFULSET_NAME -n $KUBERNETES_NAMESPACE
+```
 
 ## Environment
 
@@ -98,9 +132,9 @@ Iceberg is a library added to Spark. Its runtime jar is named after the Spark an
 
 ## SparkSession with S3 access
 
-Onyxia issues temporary STS credentials as environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`) and the endpoint of the object storage (`AWS_S3_ENDPOINT`). The DuckDB lab relied on the `s3_onyxia_connection` secret being picked up automatically. Spark's Hadoop S3A connector needs the same information configured explicitly, including the `TemporaryAWSCredentialsProvider`, which is required because the default provider ignores the session token.
+Onyxia issues temporary STS credentials as environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`) and the endpoint of the object storage (`AWS_S3_ENDPOINT`). The [DuckDB lab](../04.sql-analytics/lab-duckdb.md) relied on the `s3_onyxia_connection` secret being picked up automatically. Spark's Hadoop S3A connector needs the same information configured explicitly, including the `TemporaryAWSCredentialsProvider`, which is required because the default provider ignores the session token.
 
-The session also declares an Iceberg catalog named `lab`, used at the end of the lab. It must be configured now: the libraries of a session are loaded when it starts. The catalog is of type `hadoop`, a directory in the bucket, which needs no server.
+The session also declares an Iceberg catalog named `lab`, used at the end of the lab. It must be configured now: the libraries of a session are loaded when it starts. The catalog is of type `hadoop` which needs no server.
 
 Launch PySpark shell.
 
@@ -499,14 +533,14 @@ Count the rows and sum the quantities in both outputs with the DuckDB CLI. The t
 ```bash
 duckdb -c "
   SELECT 'dbt' AS engine, count(*) AS orders, sum(quantity) AS quantity
-  FROM 's3://$LAB_BUCKET_NAME/silver/dbt/stg_orders.parquet'
+  FROM 's3://$LAB_BUCKET_NAME/silver/dbt/orders.parquet'
   UNION ALL
   SELECT 'spark', count(*), sum(quantity)
   FROM 's3://$LAB_BUCKET_NAME/silver/spark/orders.parquet/*.parquet'
 "
 duckdb -c "
   SELECT 'dbt' AS engine, count(*) AS users
-  FROM 's3://$LAB_BUCKET_NAME/silver/dbt/stg_users.parquet'
+  FROM 's3://$LAB_BUCKET_NAME/silver/dbt/users.parquet'
   UNION ALL
   SELECT 'spark', count(*)
   FROM 's3://$LAB_BUCKET_NAME/silver/spark/users.parquet/*.parquet'
@@ -516,8 +550,8 @@ duckdb -c "
 Compare the schemas, in particular the type of `order_id` and `ordered_at`:
 
 ```bash
-duckdb -c "DESCRIBE SELECT * FROM 's3://$LAB_BUCKET_NAME/silver/stg_orders.parquet'"
-duckdb -c "DESCRIBE SELECT * FROM 's3://$LAB_BUCKET_NAME/silver/orders.parquet/*.parquet'"
+duckdb -c "DESCRIBE SELECT * FROM 's3://$LAB_BUCKET_NAME/silver/dbt/orders.parquet'"
+duckdb -c "DESCRIBE SELECT * FROM 's3://$LAB_BUCKET_NAME/silver/spark/orders.parquet/*.parquet'"
 ```
 
 Questions:
@@ -533,7 +567,7 @@ Questions:
 
 1. Add a `birthdate_is_valid` boolean column to `stg_users`, `False` when a user's birthdate is later than their first order date. This requires joining `stg_users` and `stg_orders`. Write it once with the DataFrame API and once with Spark SQL, and check that the two agree. Compare with the fix of the dbt lab.
 2. Rewrite the `zip_code` extraction as a plain Python UDF, then as a `pandas_udf`. Time both with `%%timeit` on the full `users_bronze` DataFrame and compare against the `regexp_extract()` version above.
-3. The bronze CSVs are read from S3 on every run of this notebook. Cache `users_bronze` and `orders_bronze` with `.cache()` after the first read, and check the **Spark UI** (`http://localhost:4040`) to see the effect on later stages.
+3. The bronze CSVs are read from S3 on every run of this notebook. Cache `users_bronze` and `orders_bronze` with `.cache()` after the first read, and check the **Spark UI** to see the effect on later stages. To access the UI, refer to the [Spark introduction lab](../06.spark-introduction/lab-pyspark-rdd.md).
 4. Append one new order to `lab.silver.orders` with `writeTo(...).append()`. List the snapshots of the table, then read the table as it was before the append, with `VERSION AS OF` in Spark SQL. Do the same with the Parquet directory and explain the difference.
 
 Stop the Spark session:
@@ -542,6 +576,8 @@ Stop the Spark session:
 spark.stop()
 exit()
 ```
+
+The objects of the silver layer are kept for the next modules.
 
 ---
 
