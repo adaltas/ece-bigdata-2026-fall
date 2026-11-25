@@ -119,18 +119,6 @@ Every hop carries a row layout: field names, types and lengths. A transform need
 - Fields guessed with Get Fields
 - Fields declared and kept as-is
 
-## Demo: a first pipeline
-
-Live build in Hop Web, on the orders dataset used in the previous labs:
-
-1. `CSV File Input`: read `orders.csv` with declared fields.
-2. `Select Values`: rename `uuid` to `order_id`, cast `quantity` to `Integer`.
-3. `Filter Rows`: keep `quantity > 0`, observe the true and the false outputs.
-4. `Text File Output` (or preview): show the result.
-5. Run it, then read the transform metrics: rows read, written, speed.
-
-The lab continues with the users dataset and the Parquet output.
-
 ---
 
 _The content of this document, including all text, images, and associated materials, is the exclusive property of Adaltas and is protected by applicable copyright laws. Unauthorized distribution, reproduction, or sharing of this content, in whole or in part, is strictly prohibited without the express written consent of the author(s). Any violation of this restriction may result in legal action and the imposition of penalties as prescribed by law._
