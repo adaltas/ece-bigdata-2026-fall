@@ -306,7 +306,7 @@ Expected: 50 users, 44 with a city. The 6 others have a military address (`DPO`,
 Download the pre-defined [`silver-orders.hpl`](./lab/pipelines/silver-orders.hpl) from the class module in the `hop-web` container.
 
 ```bash
-FILE_URL=<pipeline-file-url-in-class-repo>
+FILE_URL=https://raw.githubusercontent.com/adaltas/ece-bigdata-2026-fall/refs/heads/main/11.hop/lab/pipelines/silver-orders.hpl
 docker exec hop-web curl -fsSL -o /home/hop/hop-project/pipelines/silver-orders.hpl "${FILE_URL}"
 ```
 
