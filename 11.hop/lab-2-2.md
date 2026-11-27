@@ -266,7 +266,7 @@ Expected: 50 users, 44 with a city. The 6 others have a military address (`DPO`,
 Download the pre-defined [`silver-orders.hpl`](./lab/pipelines/silver-orders.hpl) from the class module into Hop Web pod.
 
 ```bash
-FILE_URL=<pipeline-file-url>
+FILE_URL="https://raw.githubusercontent.com/adaltas/ece-bigdata-2026-fall/refs/heads/main/11.hop/lab/pipelines/silver-orders.hpl"
 POD=$(kubectl get pod -l app.kubernetes.io/name=hop-web -o jsonpath='{.items[0].metadata.name}')
 kubectl exec ${POD} -- curl -s -o "/home/hop/hop-project/pipelines/silver-orders.hpl" ${FILE_URL}
 ```
