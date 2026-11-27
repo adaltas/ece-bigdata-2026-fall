@@ -40,7 +40,10 @@ tags:
 
 ## Prerequisites
 
-- The `vscode-pyspark` Onyxia service and the project of the [Spark DataFrame lab](./lab-pyspark-silver.md)
+- The `vscode-pyspark` Onyxia service with image: `inseefrlab/onyxia-vscode-pyspark:py3.13.15-spark4.1.1` instead of default image which is using Spark version 4.3.
+
+![setup spark version 4.1.1](./assets/onyxia-vscode-spark-image.png)
+
 - The `stg_users` and `stg_orders` DataFrames created in that lab
 - A network connection to Maven Central
 

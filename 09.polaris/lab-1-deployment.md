@@ -35,6 +35,10 @@ This lab is a prerequisite for the [Polaris lab](./lab.md). It describes how to 
 
 ## Prerequisites
 
+- The `vscode-pyspark` Onyxia service with image: `inseefrlab/onyxia-vscode-pyspark:py3.13.15-spark4.1.1` instead of default image which is using Spark version 4.3.
+
+![setup spark version 4.1.1](./assets/onyxia-vscode-spark-image.png)
+
 - The `vscode-pyspark` Onyxia service with limits of `cpu: 2000m`, `memory 2500Mi`.
 
 ```bash

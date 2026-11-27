@@ -45,11 +45,11 @@ tags:
 - The [dbt lab](./lab-dbt.md), which builds the same silver layer in SQL. Its output in `silver/` is used for the comparison at the end of this lab. If you removed it, run `uv run dbt build` again from the `lab_medallion` directory.
 - A network access to Maven Central: the Iceberg library is downloaded when the Spark session starts
 - Environment variables containing the current S3 credentials.
-- The `vscode-pyspark` Onyxia service with limits of `cpu: 4000m`, `memory 4000Mi`.
+- The `vscode-pyspark` Onyxia service with image: `inseefrlab/onyxia-vscode-pyspark:py3.13.15-spark4.1.1` instead of default image which is using Spark version 4.3.
 
-For a new `vscode-pyspark` service, from service configuration using "Form":
+![setup spark version 4.1.1](./assets/onyxia-vscode-spark-image.png)
 
-![setup Onyxia service](./assets/onyxia-vscode-resource-form.png)
+- The `vscode-pyspark` Onyxia service with limits of `cpu: 2000m`, `memory 2500Mi`.
 
 For a new `vscode-pyspark` service, from service configuration using "Text Editor" line 27 - 29:
 
@@ -74,8 +74,8 @@ kubectl patch statefulset $STATEFULSET_NAME \
                 "memory": "1Gi"
               },
               "limits": {
-                "cpu": "4"
-                ,"memory": "4Gi"
+                "cpu": "2000m"
+                ,"memory": "2500Mi"
               }
             }
           }]
