@@ -84,7 +84,7 @@ Hop Web reads and writes the buckets through Hop's virtual filesystem. A custom 
 
 In Hop Web, open the metadata pane (`m` icon), create an "S3 Connection" and save it in the project:
 
-- "Name": `Onyxia`. The name is the URL scheme: paths read `onyxia://<bucket>/silver/hop/...`
+- "Name": `onyxia`. The name is the URL scheme: paths read `onyxia://<bucket>/silver/hop/...`
 - "region": `us-east-1`
 - "Authentication type": `Default`. (The credentials are read from the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN` environment variables of the `Job`. No credential is written in the project.)
 - "Endpoint URL": `https://${AWS_S3_ENDPOINT}`
